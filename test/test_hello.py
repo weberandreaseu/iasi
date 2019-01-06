@@ -1,7 +1,7 @@
 import unittest
-# from iasi import hdo
-from iasi import hello
+import iasi
 
-class TestDelta(unittest.TestCase):
+
+class TestHello(unittest.TestCase):
     def test_hello_world(self):
-        self.assertEqual(hello.say_hello_world('World'), 'Hello World')
+        self.assertEqual(iasi.say_hello_world('World'), 'Hello World')
