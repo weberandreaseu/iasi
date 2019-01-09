@@ -15,8 +15,8 @@ class TestAverageKernel(unittest.TestCase):
         nc.close()
 
     def test_singular_value_decomposition(self):
-        m, n = 8, 12
-        a = np.random.randn(m, n) + 1.j*np.random.randn(m, n)
-        U, s, Vh = svd.decompose(a)
+        m, n = 29, 29
+        a = np.random.rand(m, n)
+        U, s, Vh = svd.decompose(a, reduction_factor=0.8)
         a_ = svd.reconstruct(U, s, Vh)
-        self.assertTrue(np.allclose(a, a_))
+        self.assertTrue(np.allclose(a, a_, atol=0.1))
