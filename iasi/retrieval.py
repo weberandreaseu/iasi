@@ -90,7 +90,6 @@ class DeltaDRetrieval():
                 alt.append(atm_alt[event, level_of_interest + n])
             lat = nc['lat'][...]
             lon = nc['lon'][...]
-            local_time = nc['LT_hours'][...]
             utc_time = nc['Time'][...]
             date = nc['Date'][...]
             fit_quality = nc['fit_quality'][...]

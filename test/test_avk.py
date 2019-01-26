@@ -7,12 +7,10 @@ from iasi import svd
 
 class TestAverageKernel(unittest.TestCase):
     def test_kernel_shape(self):
-        nc = Dataset(
-            'data/IASI-A_20160627_50269_v2018_fast_part0_20180413215350.nc', 'r')
-        self.assertIsNotNone(nc)
-        avk = nc.variables['state_WVatm_avk']
-        self.assertEqual(avk.shape, (12000, 2, 2, 28, 28))
-        nc.close()
+        with Dataset('test/resources/input/IASI-test-single-event.nc', 'r') as nc:
+            self.assertIsNotNone(nc)
+            avk = nc.variables['state_WVatm_avk']
+            self.assertEqual(avk.shape, (1, 2, 2, 28, 28))
 
     def test_singular_value_decomposition(self):
         m, n = 29, 29
