@@ -7,7 +7,7 @@ from iasi import svd
 
 class TestAverageKernel(unittest.TestCase):
     def test_kernel_shape(self):
-        with Dataset('test/resources/input/IASI-test-single-event.nc', 'r') as nc:
+        with Dataset('test/resources/IASI-test-single-event.nc', 'r') as nc:
             self.assertIsNotNone(nc)
             avk = nc.variables['state_WVatm_avk']
             self.assertEqual(avk.shape, (1, 2, 2, 28, 28))

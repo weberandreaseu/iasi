@@ -6,7 +6,7 @@ from iasi import DeltaDRetrieval
 class TestDeltaDRetrieval(unittest.TestCase):
     def setUp(self):
         # netCDF file for testing purpose containing a single observation
-        self.retrieval = DeltaDRetrieval('test/resources/input/IASI-test*')
+        self.retrieval = DeltaDRetrieval('test/resources/IASI-test*')
 
     def test_file_pattern(self):
         description = self.retrieval.describe()
