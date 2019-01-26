@@ -6,3 +6,5 @@ python: "3.7"
 install: pip install -r requirements.txt
 # run unittest in test directory
 script: python -m unittest discover -v -s ./test
+# enable caching
+cache: pip
