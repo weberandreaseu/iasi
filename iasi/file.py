@@ -28,6 +28,8 @@ class CopyNetcdfFile(CustomTask):
     exclusions = luigi.ListParameter(default=[])
 
     def requires(self):
+        if self.exclusions and self.inclusions:
+            raise AttributeError('Both inclusions and exclusions are defined.')
         return ReadFile(file=self.file)
     
     def output(self):
@@ -52,6 +54,9 @@ class CopyNetcdfFile(CustomTask):
     def copy_variables(self, input: Dataset, output: Dataset) -> None:
         # source https://gist.github.com/guziy/8543562
         for name, var in input.variables.items():
+
+            if name in self.exclusions or (self.inclusions and name not in self.inclusions):
+                continue
             out_var = output.createVariable(name, var.datatype, var.dimensions)
             out_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
             out_var[:] = var[:]
