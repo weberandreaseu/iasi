@@ -1,0 +1,11 @@
+#!/bin/bash
+
+input=$1
+output=$2
+
+if [ -z "$input" ] || [ -z "$output" ]; then
+    echo "Usage: subset <input> <output>"
+    exit 1
+fi
+
+ncks -v state_WVatm_avk,state_WVatm,atm_altitude,state_WVatm_a,atm_nol,lat,lon,fit_quality,iter,srf_flag,Time,Date $input $output

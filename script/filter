@@ -1,0 +1,12 @@
+#!/bin/bash
+
+events=$1
+input=$2
+output=$3
+
+if [ -z "$events" ] ||  [ -z "$input" ] || [ -z "$output" ]; then
+    echo "Usage: filter <number-events> <input> <output>"
+    exit 1
+fi
+
+ncks -d event,$events $input $output
