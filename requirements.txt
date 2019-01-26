@@ -4,3 +4,4 @@ matplotlib
 jupyter
 netcdf4
 scipy
+luigi
