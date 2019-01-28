@@ -1,3 +1,4 @@
+import os
 from math import ceil
 from typing import Tuple
 
@@ -13,6 +14,13 @@ class SingularValueDecomposition(CopyNetcdfFile):
 
     dim = luigi.IntParameter()
     exclusions = luigi.ListParameter(default=['state_WVatm_avk'])
+
+    def output(self):
+        _, file = os.path.split(self.file)
+        path = os.path.join(self.dst, 'svd', str(self.dim), file)
+        target = luigi.LocalTarget(path)
+        target.makedirs()
+        return target
 
     def run(self):
         input = Dataset(self.input().path)
@@ -48,7 +56,7 @@ class SingularValueDecomposition(CopyNetcdfFile):
     def create_variables(self, dataset: Dataset, grid_levels: int) -> None:
         U = dataset.createVariable('state_WVatm_avk_U', 'f8',
                                    ('event', 'atmospheric_species', 'atmospheric_species',
-                                    'kernel_eigenvalues', 'atmospheric_grid_levels'),
+                                    'atmospheric_grid_levels', 'kernel_eigenvalues'),
                                    fill_value=-9999.9)
         U.description = "U component of singular value decomposition"
         s = dataset.createVariable('state_WVatm_avk_s', 'f8',
@@ -58,10 +66,6 @@ class SingularValueDecomposition(CopyNetcdfFile):
         s.description = "Eigenvalues (sigma) of singular value decomposition"
         Vh = dataset.createVariable('state_WVatm_avk_Vh', 'f8',
                                     ('event', 'atmospheric_species', 'atmospheric_species',
-                                     'atmospheric_grid_levels', 'kernel_eigenvalues'),
+                                     'kernel_eigenvalues', 'atmospheric_grid_levels'),
                                     fill_value=-9999.9)
         Vh.description = "Vh component of singular value decomposition"
-
-    def reconstruct(self, U: np.ndarray, s: np.ndarray, Vh: np.ndarray) -> np.ndarray:
-        sigma = np.diag(s)
-        return np.dot(U, np.dot(sigma, Vh))

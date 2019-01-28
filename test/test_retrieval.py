@@ -7,11 +7,6 @@ from iasi.retrieval import DeltaDRetrieval
 
 
 class TestDeltaDRetrieval(unittest.TestCase):
-    def setUp(self):
-        pass
-        # netCDF file for testing purpose containing a single observation
-        # self.retrieval = DeltaDRetrieval('test/resources/IASI-test*')
-
     def test_uncompressed_retrieval(self):
         task = DeltaDRetrieval(
             file='test/resources/IASI-test-single-event.nc',
@@ -22,6 +17,23 @@ class TestDeltaDRetrieval(unittest.TestCase):
         self.assertTrue(success)
         with task.output().open('r') as file:
             df = pd.read_csv(file)
+            self.verify_results(df)
+
+    def test_compressed_retrieval(self):
+        task = DeltaDRetrieval(
+            file='test/resources/IASI-test-single-event.nc',
+            dst='/tmp/iasi',
+            svd=True,
+            force=True,
+            dim=6
+        )
+        success = luigi.build([task], local_scheduler=True)
+        self.assertTrue(success)
+        with task.output().open('r') as file:
+            df = pd.read_csv(file)
+            self.verify_results(df)
+
+    def verify_results(self, df: pd.DataFrame) -> None:
         # test shape
         # number_columns = len(DeltaDRetrieval.output_variables)
         self.assertEqual(df.shape, (1, 5))

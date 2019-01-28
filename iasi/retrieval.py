@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from iasi.util import CustomTask
 from iasi.file import ReadFile, CopyNetcdfFile
+from iasi.svd import SingularValueDecomposition
 import luigi
 import os
 
@@ -16,6 +17,8 @@ import os
 class DeltaDRetrieval(CopyNetcdfFile):
     # 5km height from above
     level_of_interest = luigi.IntParameter(default=-19)
+    svd = luigi.BoolParameter()
+    dim = luigi.IntParameter(default=14)
 
     output_variables = [
         'H2O', 'delD', 'lat', 'lon', 'datetime', 'fqual', 'iter',
@@ -24,11 +27,22 @@ class DeltaDRetrieval(CopyNetcdfFile):
 
     calculated = ['H2O', 'delD', 'dofs_T2', 'Sens', 'atm_alt']
 
+    def requires(self):
+        if self.exclusions and self.inclusions:
+            raise AttributeError('Only inclusions OR exclusions are allowed.')
+        if self.svd:
+            return SingularValueDecomposition(dst=self.dst, file=self.file, dim=self.dim)
+        return ReadFile(file=self.file)
+
     def output(self):
         # TODO refactor to generic method in CustomTask
         _, file = os.path.split(self.file)
         filename, _ = os.path.splitext(file)
-        path = os.path.join(self.dst, 'retrieval', filename + '.csv')
+        if self.svd:
+            path = os.path.join(self.dst, 'retrieval', 'svd',
+                                str(self.dim), filename + '.csv')
+        else:
+            path = os.path.join(self.dst, 'retrieval', filename + '.csv')
         target = luigi.LocalTarget(path)
         target.makedirs()
         return target
@@ -36,7 +50,8 @@ class DeltaDRetrieval(CopyNetcdfFile):
     def run(self) -> pd.DataFrame:
         with Dataset(self.input().path, 'r') as nc:
             events = nc.dimensions['event'].size
-            self.avk = nc['state_WVatm_avk'][...]
+            self.avk = nc['state_WVatm_avk'][...] if not self.svd else self.reconstruct(
+                nc)
             self.wv = nc['state_WVatm'][...]
             self.atm_alt = nc['atm_altitude'][...]
             self.wv_a = nc['state_WVatm_a'][...]
@@ -84,6 +99,27 @@ class DeltaDRetrieval(CopyNetcdfFile):
             np.sqrt(S__[self.level_of_interest, self.level_of_interest]))
         self.result['atm_alt'].append(
             self.atm_alt[event, self.level_of_interest + n])
+
+    def reconstruct(self, dataset: Dataset) -> np.ndarray:
+        avk_U = dataset['state_WVatm_avk_U'][...]
+        avk_s = dataset['state_WVatm_avk_s'][...]
+        avk_Vh = dataset['state_WVatm_avk_Vh'][...]
+        events = dataset.dimensions['event'].size
+        grid_levels = dataset.dimensions['atmospheric_grid_levels'].size
+        species = dataset.dimensions['atmospheric_species'].size
+        result = np.ndarray(
+            shape=(events, species, species, grid_levels, grid_levels),
+            dtype=np.float64
+        )
+        for event in range(events):
+            for row in range(species):
+                for column in range(species):
+                    U = avk_U[event, row, column, :]
+                    s = avk_s[event, row, column, :]
+                    Vh = avk_Vh[event, row, column, :]
+                    sigma = np.diag(s)
+                    result[event, row, column] = np.dot(U, np.dot(sigma, Vh))
+        return result
 
     # def retrieve(self) -> pd.DataFrame:
     #     for d, t in zip(date.astype(int), utc_time.astype(int)):
