@@ -1,9 +1,10 @@
 import unittest
 
+import luigi
 import numpy as np
 from netCDF4 import Dataset
-from iasi.svd import SingularValueDecomposition
-import luigi
+
+from iasi import SingularValueDecomposition
 
 
 class TestSingularValueDecomposition(unittest.TestCase):

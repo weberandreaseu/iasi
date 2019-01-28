@@ -7,7 +7,7 @@ import numpy as np
 from netCDF4 import Dataset
 from scipy import linalg
 
-from iasi.file import CopyNetcdfFile, ReadFile
+from iasi.file import CopyNetcdfFile
 
 
 class SingularValueDecomposition(CopyNetcdfFile):

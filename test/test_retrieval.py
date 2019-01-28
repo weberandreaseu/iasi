@@ -3,7 +3,7 @@ import unittest
 import luigi
 import pandas as pd
 
-from iasi.retrieval import DeltaDRetrieval
+from iasi import DeltaDRetrieval
 
 
 class TestDeltaDRetrieval(unittest.TestCase):

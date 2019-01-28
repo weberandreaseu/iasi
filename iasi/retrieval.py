@@ -1,24 +1,26 @@
 import glob
 import logging
+import os
 import time
 from datetime import datetime
 from typing import Dict
 
-from netCDF4 import Dataset
+import luigi
 import numpy as np
 import pandas as pd
-from iasi.util import CustomTask
-from iasi.file import ReadFile, CopyNetcdfFile
+from netCDF4 import Dataset
+
 from iasi.svd import SingularValueDecomposition
-import luigi
-import os
+from iasi.file import CopyNetcdfFile, ReadFile
+from iasi.util import CustomTask
 
 
-class DeltaDRetrieval(CopyNetcdfFile):
+class DeltaDRetrieval(CustomTask):
     # 5km height from above
     level_of_interest = luigi.IntParameter(default=-19)
     svd = luigi.BoolParameter()
     dim = luigi.IntParameter(default=14)
+    file = luigi.Parameter()
 
     output_variables = [
         'H2O', 'delD', 'lat', 'lon', 'datetime', 'fqual', 'iter',
@@ -28,8 +30,6 @@ class DeltaDRetrieval(CopyNetcdfFile):
     calculated = ['H2O', 'delD', 'dofs_T2', 'Sens', 'atm_alt']
 
     def requires(self):
-        if self.exclusions and self.inclusions:
-            raise AttributeError('Only inclusions OR exclusions are allowed.')
         if self.svd:
             return SingularValueDecomposition(dst=self.dst, file=self.file, dim=self.dim)
         return ReadFile(file=self.file)

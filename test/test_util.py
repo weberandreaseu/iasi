@@ -1,6 +1,7 @@
-import unittest
-from iasi.util import CustomTask
 import os
+import unittest
+
+from iasi.util import CustomTask
 
 
 class TestCustomTask(unittest.TestCase):
