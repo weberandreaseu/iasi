@@ -35,11 +35,7 @@ class CopyNetcdfFile(CustomTask):
         return ReadFile(file=self.file)
 
     def output(self):
-        _, file = os.path.split(self.file)
-        path = os.path.join(self.dst, file)
-        target = luigi.LocalTarget(path)
-        target.makedirs()
-        return target
+        return self.create_local_target(file=self.file)
 
     def run(self):
         input = Dataset(self.input().path, 'r')

@@ -32,3 +32,13 @@ class CustomTask(ForceableTask):
         dst     base directory for output
     """
     dst = luigi.Parameter()
+
+    def create_local_target(self, *args: str, file: str, ext: str = None) -> luigi.LocalTarget:
+        _, filename = os.path.split(file)
+        if ext:
+            name, _ = os.path.splitext(filename)
+            filename = f'{name}.{ext}'
+        path = os.path.join(self.dst, *args, filename)
+        target = luigi.LocalTarget(path)
+        target.makedirs()
+        return target

@@ -35,17 +35,11 @@ class DeltaDRetrieval(CopyNetcdfFile):
         return ReadFile(file=self.file)
 
     def output(self):
-        # TODO refactor to generic method in CustomTask
-        _, file = os.path.split(self.file)
-        filename, _ = os.path.splitext(file)
         if self.svd:
-            path = os.path.join(self.dst, 'retrieval', 'svd',
-                                str(self.dim), filename + '.csv')
+            subdirectories = ['retrieval', 'svd', str(self.dim)]
         else:
-            path = os.path.join(self.dst, 'retrieval', filename + '.csv')
-        target = luigi.LocalTarget(path)
-        target.makedirs()
-        return target
+            subdirectories = ['retrieval', 'direct']
+        return self.create_local_target(*subdirectories, file=self.file, ext='csv')
 
     def run(self) -> pd.DataFrame:
         with Dataset(self.input().path, 'r') as nc:
