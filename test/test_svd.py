@@ -14,7 +14,7 @@ class TestSingularValueDecomposition(unittest.TestCase):
             file='test/resources/IASI-test-single-event.nc',
             dst='/tmp/iasi',
             force=True,
-            dim=28
+            dim=14
         )
         success = luigi.build([task], local_scheduler=True)
         self.assertTrue(success)

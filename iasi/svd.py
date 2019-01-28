@@ -36,16 +36,28 @@ class SingularValueDecomposition(CopyNetcdfFile):
         for event in range(events):
             for row in range(species):
                 for column in range(species):
-                    levels = int(nol[event])
+                    levels = nol[event]
+                    # TODO: clarify when input is assumed as valid
+                    if np.ma.is_masked(levels):
+                        continue
+                    levels = int(levels)
                     kernel = avk[event, row, column, :levels, :levels]
+                    if np.ma.is_masked(kernel):
+                        continue
+                    if np.isnan(kernel.data).any() or np.isinf(kernel.data).any():
+                        continue
                     U, s, Vh = linalg.svd(kernel.data, full_matrices=False)
                     # reduce dimension to given number of eigenvalues
-                    U = U[:, :self.dim]
-                    s = s[:self.dim]
-                    Vh = Vh[:self.dim, :]
-                    output['state_WVatm_avk_U'][event, row, column] = U
-                    output['state_WVatm_avk_s'][event, row, column] = s
-                    output['state_WVatm_avk_Vh'][event, row, column] = Vh
+                    # max number of eigenvalues is number of levels
+                    dim = min(self.dim, levels)
+                    U = U[:, :dim]
+                    s = s[:dim]
+                    Vh = Vh[:dim, :]
+                    output['state_WVatm_avk_U'][event, row,
+                                                column, :levels, :dim] = U
+                    output['state_WVatm_avk_s'][event, row, column, :dim] = s
+                    output['state_WVatm_avk_Vh'][event, row,
+                                                 column, :dim, :levels] = Vh
         input.close()
         output.close()
 

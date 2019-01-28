@@ -58,6 +58,7 @@ class DeltaDRetrieval(CustomTask):
             df.to_csv(file, index=None)
 
     def process_event(self, event: int):
+        # skip masked events
         if isinstance(self.avk, np.ma.MaskedArray) and self.avk[event].mask.all():
             return
         n = int(self.nol[event])
