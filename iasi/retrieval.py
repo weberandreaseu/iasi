@@ -61,7 +61,10 @@ class DeltaDRetrieval(CustomTask):
         # skip masked events
         if isinstance(self.avk, np.ma.MaskedArray) and self.avk[event].mask.all():
             return
-        n = int(self.nol[event])
+        levels = self.nol[event]
+        if np.ma.is_masked(levels):
+            return
+        n = int(levels)
         P = np.block([[np.identity(n)*0.5, np.identity(n)*0.5],
                       [-np.identity(n), np.identity(n)]])
         P_inv = np.linalg.inv(P)
