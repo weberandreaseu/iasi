@@ -1,7 +1,9 @@
 import unittest
+
 import luigi
-from iasi.file import CopyNetcdfFile
 from netCDF4 import Dataset
+
+from iasi import CopyNetcdfFile
 
 
 class TestCopyNetcdf(unittest.TestCase):
