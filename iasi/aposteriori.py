@@ -10,12 +10,12 @@ import numpy as np
 import pandas as pd
 from netCDF4 import Dataset
 
-from iasi.svd import SingularValueDecomposition
+from iasi.compression import SingularValueDecomposition
 from iasi.file import CopyNetcdfFile, ReadFile
 from iasi.util import CustomTask
 
 
-class DeltaDRetrieval(CustomTask):
+class AposterioriProcessing(CustomTask):
     # 5km height from above
     level_of_interest = luigi.IntParameter(default=-19)
     svd = luigi.BoolParameter()

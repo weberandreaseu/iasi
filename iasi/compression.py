@@ -34,10 +34,6 @@ class SingularValueDecomposition(CopyNetcdfFile):
         nol = input.variables['atm_nol'][...]
         # decompose average kernel for each event
         for event in range(events):
-            if event % 50 == 0:
-                progress = event / events * 100
-                self.set_status_message("Progress: %d / 100" % progress)
-                self.set_progress_percentage(progress)
             for row in range(species):
                 for column in range(species):
                     levels = nol[event]

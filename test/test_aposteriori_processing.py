@@ -3,12 +3,12 @@ import unittest
 import luigi
 import pandas as pd
 
-from iasi import DeltaDRetrieval
+from iasi import AposterioriProcessing
 
 
-class TestDeltaDRetrieval(unittest.TestCase):
+class TestAposterioriProcessing(unittest.TestCase):
     def test_uncompressed_retrieval(self):
-        task = DeltaDRetrieval(
+        task = AposterioriProcessing(
             file='test/resources/IASI-test-single-event.nc',
             dst='/tmp/iasi',
             force=True
@@ -20,7 +20,7 @@ class TestDeltaDRetrieval(unittest.TestCase):
             self.verify_results(df)
 
     def test_compressed_retrieval(self):
-        task = DeltaDRetrieval(
+        task = AposterioriProcessing(
             file='test/resources/IASI-test-single-event.nc',
             dst='/tmp/iasi',
             svd=True,
@@ -39,7 +39,7 @@ class TestDeltaDRetrieval(unittest.TestCase):
         self.assertEqual(df.shape, (1, 5))
         # test column names
         column_names = list(df)
-        self.assertListEqual(column_names, DeltaDRetrieval.calculated)
+        self.assertListEqual(column_names, AposterioriProcessing.calculated)
         # test result of calculated values
         event = df.iloc[0]
         self.assertAlmostEqual(event['H2O'],         1395.876548,   delta=5)
