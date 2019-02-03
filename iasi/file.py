@@ -2,37 +2,35 @@ import luigi
 from iasi.util import CustomTask
 from netCDF4 import Dataset
 import os
+from luigi.util import inherits, requires, common_params
+from luigi import Config
 
 
 class ReadFile(luigi.ExternalTask):
-    """Basic class for reading a local file as input for a luigi task.
-
-    Attributes:
-        file    path to local file to open
-    """
+    """Basic class for reading a local file as input for a luigi task."""
     file = luigi.Parameter()
 
     def output(self):
         return luigi.LocalTarget(self.file)
 
 
+@requires(ReadFile)
 class CopyNetcdfFile(CustomTask):
     """Luigi Task for copying netCDF files with a subset of variables
 
     Attributes:  
-        file        path to local file to open
         inclusions  variables to include
         exclusions  variables to exclude
+        format      used netCDF format
     """
-    file = luigi.Parameter()
     inclusions = luigi.ListParameter(default=[])
     exclusions = luigi.ListParameter(default=[])
     format = luigi.Parameter(default='NETCDF4')
 
-    def requires(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         if self.exclusions and self.inclusions:
             raise AttributeError('Only inclusions OR exclusions are allowed.')
-        return ReadFile(file=self.file)
 
     def output(self):
         return self.create_local_target(file=self.file)

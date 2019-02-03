@@ -1,6 +1,10 @@
 import os
 
 import luigi
+from luigi.util import inherits, requires
+
+class CommonParams(luigi.Task):
+    dst = luigi.Parameter()
 
 
 class ForceableTask(luigi.Task):
@@ -29,9 +33,11 @@ class CustomTask(ForceableTask):
     """Base luigi task which provides common attributes accessable by subclasses
 
     Attributes:
+        file    path to local file to open
         dst     base directory for output
     """
     dst = luigi.Parameter()
+
 
     def create_local_target(self, *args: str, file: str, ext: str = None) -> luigi.LocalTarget:
         _, filename = os.path.split(file)

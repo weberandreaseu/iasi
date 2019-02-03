@@ -9,10 +9,12 @@ from scipy import linalg
 
 from iasi.file import CopyNetcdfFile
 
-
-class SingularValueDecomposition(CopyNetcdfFile):
-
+class CompressionTask(CopyNetcdfFile):
     dim = luigi.IntParameter()
+
+
+class SingularValueDecomposition(CompressionTask):
+
     exclusions = luigi.ListParameter(default=['state_WVatm_avk'])
 
     def output(self):

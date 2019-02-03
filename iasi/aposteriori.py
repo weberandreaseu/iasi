@@ -14,6 +14,8 @@ from iasi.compression import SingularValueDecomposition
 from iasi.file import CopyNetcdfFile, ReadFile
 from iasi.util import CustomTask
 
+from luigi.util import requires
+
 
 class AposterioriProcessing(CustomTask):
     # 5km height from above
@@ -30,22 +32,15 @@ class AposterioriProcessing(CustomTask):
     calculated = ['H2O', 'delD', 'dofs_T2', 'Sens', 'atm_alt']
 
     def requires(self):
-        if self.svd:
-            return SingularValueDecomposition(dst=self.dst, file=self.file, dim=self.dim)
-        return ReadFile(file=self.file)
+        raise NotImplementedError
 
     def output(self):
-        if self.svd:
-            subdirectories = ['retrieval', 'svd', str(self.dim)]
-        else:
-            subdirectories = ['retrieval', 'direct']
-        return self.create_local_target(*subdirectories, file=self.file, ext='csv')
+        raise NotImplementedError
 
     def run(self) -> pd.DataFrame:
         with Dataset(self.input().path, 'r') as nc:
             events = nc.dimensions['event'].size
-            self.avk = nc['state_WVatm_avk'][...] if not self.svd else self.reconstruct(
-                nc)
+            self.avk = self.reconstruct(nc)
             self.wv = nc['state_WVatm'][...]
             self.atm_alt = nc['atm_altitude'][...]
             self.wv_a = nc['state_WVatm_a'][...]
@@ -84,8 +79,8 @@ class AposterioriProcessing(CustomTask):
                         self.atm_alt[event, np.newaxis, :n])**2 / (2 * corrlengthbl**2)))
         S_ = np.block([[S[:3, :3], Sbl[3:, :3].T],
                        [Sbl[3:, :3], S[3:, 3:]]])
-        #S_[S_ == np.inf] = 0.0
-        #S_ = S_[:n,:n]
+        # S_[S_ == np.inf] = 0.0
+        # S_ = S_[:n,:n]
         S__ = (A__[:n, :n] - np.identity(n)
                ) @ S_ @ (A__[:n, :n] - np.identity(n)).T
         self.result['H2O'].append(
@@ -99,25 +94,7 @@ class AposterioriProcessing(CustomTask):
             self.atm_alt[event, self.level_of_interest + n])
 
     def reconstruct(self, dataset: Dataset) -> np.ndarray:
-        avk_U = dataset['state_WVatm_avk_U'][...]
-        avk_s = dataset['state_WVatm_avk_s'][...]
-        avk_Vh = dataset['state_WVatm_avk_Vh'][...]
-        events = dataset.dimensions['event'].size
-        grid_levels = dataset.dimensions['atmospheric_grid_levels'].size
-        species = dataset.dimensions['atmospheric_species'].size
-        result = np.ndarray(
-            shape=(events, species, species, grid_levels, grid_levels),
-            dtype=np.float64
-        )
-        for event in range(events):
-            for row in range(species):
-                for column in range(species):
-                    U = avk_U[event, row, column, :]
-                    s = avk_s[event, row, column, :]
-                    Vh = avk_Vh[event, row, column, :]
-                    sigma = np.diag(s)
-                    result[event, row, column] = np.dot(U, np.dot(sigma, Vh))
-        return result
+        raise NotImplementedError
 
     # def retrieve(self) -> pd.DataFrame:
     #     for d, t in zip(date.astype(int), utc_time.astype(int)):
@@ -151,3 +128,39 @@ class AposterioriProcessing(CustomTask):
     #     logging.info(
     #         f'Number of files: {len(self.files)}, Number of events: {n_events}')
     #     return {'n_files': len(self.files), 'n_events': n_events}
+
+
+@requires(SingularValueDecomposition)
+class SvdAposteriori(AposterioriProcessing):
+    def output(self):
+        return self.create_local_target('aposteriori', 'svd', str(self.dim), file=self.file, ext='csv')
+
+    def reconstruct(self, dataset: Dataset):
+        avk_U = dataset['state_WVatm_avk_U'][...]
+        avk_s = dataset['state_WVatm_avk_s'][...]
+        avk_Vh = dataset['state_WVatm_avk_Vh'][...]
+        events = dataset.dimensions['event'].size
+        grid_levels = dataset.dimensions['atmospheric_grid_levels'].size
+        species = dataset.dimensions['atmospheric_species'].size
+        result = np.ndarray(
+            shape=(events, species, species, grid_levels, grid_levels),
+            dtype=np.float64
+        )
+        for event in range(events):
+            for row in range(species):
+                for column in range(species):
+                    U = avk_U[event, row, column, :]
+                    s = avk_s[event, row, column, :]
+                    Vh = avk_Vh[event, row, column, :]
+                    sigma = np.diag(s)
+                    result[event, row, column] = np.dot(U, np.dot(sigma, Vh))
+        return result
+
+
+@requires(ReadFile)
+class DirectAposteriori(AposterioriProcessing):
+    def output(self):
+        return self.create_local_target('aposteriori', 'direct', file=self.file, ext='csv')
+
+    def reconstruct(self, dataset: Dataset):
+        return dataset['state_WVatm_avk'][...]

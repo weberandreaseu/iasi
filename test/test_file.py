@@ -61,13 +61,13 @@ class TestCopyNetcdf(unittest.TestCase):
             ]
             self.assertListEqual(vars, expected)
 
-    def test_invalid_arguments(self):
-        task = CopyNetcdfFile(
+    def test_attribute_error_with_inclusions_and_exclusions(self):
+        self.assertRaises(
+            AttributeError,
+            CopyNetcdfFile,
             file=self.file,
             dst='/tmp/iasi/copy',
             force=True,
             inclusions=['state_WVatm'],
             exclusions=['state_WVatm']
         )
-        success = luigi.build([task], local_scheduler=True)
-        self.assertFalse(success)
