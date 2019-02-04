@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from netCDF4 import Dataset
 
-from iasi.compression import SingularValueDecomposition
+from iasi.compression import SingularValueDecomposition, EigenDecomposition
 from iasi.file import CopyNetcdfFile, ReadFile
 from iasi.util import CustomTask
 
@@ -154,6 +154,31 @@ class SvdAposteriori(AposterioriProcessing):
                     Vh = avk_Vh[event, row, column, :]
                     sigma = np.diag(s)
                     result[event, row, column] = np.dot(U, np.dot(sigma, Vh))
+        return result
+
+@requires(EigenDecomposition)
+class EigenAposteriori(AposterioriProcessing):
+    def output(self):
+        return self.create_local_target('aposteriori', 'eigen', str(self.dim), file=self.file, ext='csv')
+
+    def reconstruct(self, dataset: Dataset):
+        avk_Q = dataset['state_WVatm_avk_Q'][...]
+        avk_s = dataset['state_WVatm_avk_s'][...]
+        events = dataset.dimensions['event'].size
+        grid_levels = dataset.dimensions['atmospheric_grid_levels'].size
+        species = dataset.dimensions['atmospheric_species'].size
+        result = np.ndarray(
+            shape=(events, species, species, grid_levels, grid_levels),
+            dtype=np.float64
+        )
+        for event in range(events):
+            for row in range(species):
+                for column in range(species):
+                    Q = avk_Q[event, row, column, :]
+                    s = avk_s[event, row, column, :]
+                    Q_inv = np.linalg.pinv(Q)
+                    sigma = np.diag(s)
+                    result[event, row, column] = Q.dot(sigma).dot(Q_inv)
         return result
 
 

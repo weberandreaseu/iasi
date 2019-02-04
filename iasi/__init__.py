@@ -1,3 +1,3 @@
-from iasi.aposteriori import DirectAposteriori, SvdAposteriori
-from iasi.compression import SingularValueDecomposition
+from iasi.aposteriori import DirectAposteriori, SvdAposteriori, EigenAposteriori
+from iasi.compression import SingularValueDecomposition, EigenDecomposition
 from iasi.file import CopyNetcdfFile

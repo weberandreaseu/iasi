@@ -9,16 +9,10 @@ from scipy import linalg
 
 from iasi.file import CopyNetcdfFile
 
+
 class CompressionTask(CopyNetcdfFile):
     dim = luigi.IntParameter()
-
-
-class SingularValueDecomposition(CompressionTask):
-
     exclusions = luigi.ListParameter(default=['state_WVatm_avk'])
-
-    def output(self):
-        return self.create_local_target('svd', str(self.dim), file=self.file)
 
     def run(self):
         input = Dataset(self.input().path)
@@ -46,22 +40,63 @@ class SingularValueDecomposition(CompressionTask):
                     kernel = avk[event, row, column, :levels, :levels]
                     if np.ma.is_masked(kernel):
                         continue
-                    if np.isnan(kernel.data).any() or np.isinf(kernel.data).any():
-                        continue
-                    U, s, Vh = linalg.svd(kernel.data, full_matrices=False)
                     # reduce dimension to given number of eigenvalues
                     # max number of eigenvalues is number of levels
                     dim = min(self.dim, levels)
-                    U = U[:, :dim]
-                    s = s[:dim]
-                    Vh = Vh[:dim, :]
-                    output['state_WVatm_avk_U'][event, row,
-                                                column, :levels, :dim] = U
-                    output['state_WVatm_avk_s'][event, row, column, :dim] = s
-                    output['state_WVatm_avk_Vh'][event, row,
-                                                 column, :dim, :levels] = Vh
+                    if np.isnan(kernel.data).any() or np.isinf(kernel.data).any():
+                        continue
+                    self.decompose(output, kernel.data, event,
+                                   row, column, levels, dim)
         input.close()
         output.close()
+
+    def decompose(self, output: Dataset, kernel: np.ndarray, event: int, row: int, column: int, levels: int, dim: int):
+        raise NotImplementedError
+
+
+class EigenDecomposition(CompressionTask):
+
+    def output(self):
+        return self.create_local_target('eigen', str(self.dim), file=self.file)
+
+    def decompose(self, output: Dataset, kernel: np.ndarray, event: int, row: int, column: int, levels: int, dim: int):
+        eigenvalues, eigenvectors = np.linalg.eig(kernel)
+        # TODO: add warnings
+        # make shure imaginary part for first eigenvalues is near null
+        # np.testing.assert_allclose(np.imag(eigenvalues[:dim]), 0)
+        Q = np.real(eigenvectors[:, :dim])
+        s = np.real(eigenvalues[:dim])
+        output['state_WVatm_avk_Q'][event, row, column, :levels, :dim] = Q
+        output['state_WVatm_avk_s'][event, row, column, :dim] = s
+
+    def create_variables(self, dataset: Dataset, grid_levels: int) -> None:
+        Q = dataset.createVariable('state_WVatm_avk_Q', 'f8',
+                                   ('event', 'atmospheric_species', 'atmospheric_species',
+                                    'atmospheric_grid_levels', 'kernel_eigenvalues'),
+                                   fill_value=-9999.9)
+        Q.description = "Eigenvectors of eigen decomposition"
+        s = dataset.createVariable('state_WVatm_avk_s', 'f8',
+                                   ('event', 'atmospheric_species',
+                                    'atmospheric_species', 'kernel_eigenvalues'),
+                                   fill_value=-9999.9)
+        s.description = "Eigenvalues (sigma) of eigen decomposition"
+
+
+class SingularValueDecomposition(CompressionTask):
+
+    def output(self):
+        return self.create_local_target('svd', str(self.dim), file=self.file)
+
+    def decompose(self, output: Dataset, kernel: np.ndarray, event: int, row: int, column: int, levels: int, dim: int):
+        U, s, Vh = linalg.svd(kernel.data, full_matrices=False)
+        U = U[:, :dim]
+        s = s[:dim]
+        Vh = Vh[:dim, :]
+        output['state_WVatm_avk_U'][event, row,
+                                    column, :levels, :dim] = U
+        output['state_WVatm_avk_s'][event, row, column, :dim] = s
+        output['state_WVatm_avk_Vh'][event, row,
+                                     column, :dim, :levels] = Vh
 
     def create_variables(self, dataset: Dataset, grid_levels: int) -> None:
         U = dataset.createVariable('state_WVatm_avk_U', 'f8',

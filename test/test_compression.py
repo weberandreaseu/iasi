@@ -4,10 +4,10 @@ import luigi
 import numpy as np
 from netCDF4 import Dataset
 
-from iasi import SingularValueDecomposition
+from iasi import SingularValueDecomposition, EigenDecomposition
 
 
-class TestSingularValueDecomposition(unittest.TestCase):
+class TestCompression(unittest.TestCase):
 
     def test_svd_conversion(self):
         task = SingularValueDecomposition(
@@ -25,6 +25,20 @@ class TestSingularValueDecomposition(unittest.TestCase):
             self.assertIn('state_WVatm_avk_s', vars)
             self.assertIn('state_WVatm_avk_U', vars)
 
+    def test_eigen_decomposition(self):
+        task = EigenDecomposition(
+            file='test/resources/IASI-test-single-event.nc',
+            dst='/tmp/iasi',
+            force=True,
+            dim=14
+        )
+        success = luigi.build([task], local_scheduler=True)
+        self.assertTrue(success)
+        with Dataset(task.output().path) as nc:
+            vars = nc.variables.keys()
+            self.assertNotIn('state_WVatm_avk', vars)
+            self.assertIn('state_WVatm_avk_Q', vars)
+            self.assertIn('state_WVatm_avk_s', vars)
 
     # @unittest.skip
     # def test_kernel_shape(self):

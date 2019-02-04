@@ -3,7 +3,7 @@ import unittest
 import luigi
 import pandas as pd
 
-from iasi import DirectAposteriori, SvdAposteriori
+from iasi import DirectAposteriori, SvdAposteriori, EigenAposteriori
 
 
 class TestAposterioriProcessing(unittest.TestCase):
@@ -19,12 +19,25 @@ class TestAposterioriProcessing(unittest.TestCase):
             df = pd.read_csv(file)
             self.verify_results(df)
 
-    def test_compressed_retrieval(self):
+    def test_svd_retrieval(self):
         task = SvdAposteriori(
             file='test/resources/IASI-test-single-event.nc',
             dst='/tmp/iasi',
             force=True,
             dim=6
+        )
+        success = luigi.build([task], local_scheduler=True)
+        self.assertTrue(success)
+        with task.output().open('r') as file:
+            df = pd.read_csv(file)
+            self.verify_results(df)
+
+    def test_eigen_retrieval(self):
+        task = EigenAposteriori(
+            file='test/resources/IASI-test-single-event.nc',
+            dst='/tmp/iasi',
+            force=True,
+            dim=12
         )
         success = luigi.build([task], local_scheduler=True)
         self.assertTrue(success)
