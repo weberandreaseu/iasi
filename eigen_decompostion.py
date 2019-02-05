@@ -41,6 +41,7 @@ def eigen_composition(path):
     s = np.diag(s)
     return Q.dot(s).dot(Q_inv)
 
+
 def sv_composition(path):
     dataset = Dataset(path)
     U = dataset['state_WVatm_avk_U'][0, 0, 0]
@@ -48,6 +49,7 @@ def sv_composition(path):
     Vh = dataset['state_WVatm_avk_Vh'][0, 0, 0]
     sigma = np.diag(s)
     return np.dot(U, np.dot(sigma, Vh))
+
 
 # %%
 eigen_decomposition = EigenDecomposition(
@@ -70,15 +72,26 @@ avk_original = get_first(file, 'state_WVatm_avk')
 avk_eigen = eigen_composition(eigen_decomposition.output().path)
 avk_svd = sv_composition(sv_decomposition.output().path)
 
-#%%
+# %%
 plot_matrix(avk_original, 'Original AVK')
 plot_matrix(avk_eigen, 'AVK from eigen decomposition')
 plot_matrix(avk_svd, 'AVK from sv decomposition')
 
-#%%
-plot_matrix(np.abs(avk_eigen - avk_original), 'Difference between original kernel and eigen decomposition')
-plot_matrix(np.abs(avk_svd - avk_original), 'Difference between original kernel and sv decomposition')
+# %%
+eigen_diff = np.abs(avk_eigen - avk_original)
+svd_diff = np.abs(avk_svd - avk_original)
+plot_matrix(
+    eigen_diff, 'Difference between original kernel and eigen decomposition')
+plot_matrix(svd_diff, 'Difference between original kernel and sv decomposition')
 
 print('Mean absolute error')
 print(f'Eigen decomposition: {mean_absolute_error(avk_original, avk_eigen)}')
 print(f'SV decomposition: {mean_absolute_error(avk_original, avk_svd)}')
+
+# %%
+plt.hist(eigen_diff)
+plt.title('Absolute error eigen')
+plt.show()
+plt.title('Absolute error svd')
+plt.hist(svd_diff)
+plt.show()
