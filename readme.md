@@ -1,6 +1,6 @@
 # IASI
 
-[![Build Status](https://travis-ci.com/weberandreaseu/iasi.svg?branch=master)](https://travis-ci.com/weberandreaseu/iasi)
+[![Build Status](https://drone.weberandreas.eu/api/badges/weberandreaseu/iasi/status.svg)](https://drone.weberandreas.eu/weberandreaseu/iasi)
 
 ## Setup
 
