@@ -1,0 +1,13 @@
+kind: pipeline
+name: default
+
+steps:
+- name: iasi
+  image: jupyter/scipy-notebook
+  commands:
+  - pip install -r requirements.txt
+  - python -m unittest discover -v -s ./test
+  when:
+    event:
+    - push
+    - pull-request
