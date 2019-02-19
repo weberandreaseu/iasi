@@ -51,3 +51,6 @@ class TestCompression(unittest.TestCase):
             self.assertIn('Vh', vars)
             self.assertIn('s', vars)
             self.assertIn('U', vars)
+            vars = nc['/state/WV/atm_n'].variables.keys()
+            self.assertIn('Q', vars)
+            self.assertIn('s', vars)

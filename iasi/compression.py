@@ -93,9 +93,10 @@ class GroupCompression(CopyNetcdfFile):
                 if var.dimensions[-2:] != ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
                     self.copy_variable(output, var, group.path)
                     continue
-                if name.endswith('_n'):
+                if name.endswith('atm_n'):
                     # noise matrix. suitable for eigen decomposition
-                    self.eigen_decomposition(var, levels)
+                    self.eigen_decomposition(
+                        output, group, var, levels, dim_species, dim_levels)
                 else:
                     self.singular_value_decomposition(
                         group, var, dim_species, dim_levels, levels, output)
@@ -108,8 +109,8 @@ class GroupCompression(CopyNetcdfFile):
         else:
             return group
 
-    def child_variables(self, group: Group) -> List[Tuple['str', Variable]]:
-        return [g.variables.values() for g in self.child_groups(group)]
+    # def child_variables(self, group: Group) -> List[Tuple['str', Variable]]:
+    #     return [g.variables.values() for g in self.child_groups(group)]
 
     def singular_value_decomposition(self, group: Group, var: Variable, dim_species: int, dim_levels: int, nol: np.ma.MaskedArray, output: Dataset) -> np.ma.MaskedArray:
         reshaper = ArrayReshaper(var.shape, dim_levels, dim_species)
@@ -157,12 +158,47 @@ class GroupCompression(CopyNetcdfFile):
             f'{group.path}/{var.name}/Vh', 'f', Vh_dim, zlib=True)
         Vh_out[:] = all_Vh[:]
 
-    def select_significant(self, eigenvalues: List, thres=10e-4):
+    def select_significant(self, eigenvalues: List, thres=10e-4) -> List:
         most_significant = eigenvalues[0]
         return list(filter(lambda eig: eig > most_significant * thres, eigenvalues))
 
-    def eigen_decomposition(self, var: Variable, levels: np.ma.MaskedArray) -> np.ma.MaskedArray:
-        print('perform eigen decomposition on', var.name)
+    def eigen_decomposition(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
+        logger.warning('perform eigen decomposition on %s', var.name)
+        reshaper = ArrayReshaper(var.shape, dim_levels, dim_species)
+        # should be always the same because reshaped variable is square
+        events, matrix_size, _ = reshaper.new_shape()
+        all_Q = np.ma.masked_all((events, matrix_size, matrix_size))
+        all_s = np.ma.masked_all((events, matrix_size))
+        for event in range(var.shape[0]):
+            level = levels[event]
+            if np.ma.is_masked(level):
+                continue
+            # reduce array dimensions
+            matrix = reshaper.reshape(var[event][...], level)
+            # decompose reduced array
+            if np.ma.is_masked(matrix):
+                logger.warning(
+                    'Variable %s contains masked values at index %d. Skipping', var.name, event)
+                continue
+            eigenvalues, eigenvectors = np.linalg.eig(matrix)
+            most_significant = self.select_significant(eigenvalues)
+            k = len(most_significant)
+            # TODO check for imag values or symmetric property
+            try:
+                all_Q[event][:eigenvectors.shape[0], :k] = eigenvectors[:, :k]
+                all_s[event][:k] = most_significant
+            except ValueError as error:
+                logger.error('Failed to assign values')
+        # write all to output
+        dimension_name = self.dimension_names[matrix_size]
+        Q_dim = ('event', dimension_name, dimension_name)
+        Q_out = output.createVariable(
+            f'{group.path}/{var.name}/Q', 'f', Q_dim, zlib=True)
+        Q_out[:] = all_Q[:]
+        s_dim = ('event', dimension_name)
+        s_out = output.createVariable(
+            f'{group.path}/{var.name}/s', 'f', s_dim, zlib=True)
+        s_out[:] = all_s[:]
 
 
 class ArrayReshaper:
