@@ -68,7 +68,7 @@ class GroupCompression(CopyNetcdfFile):
     dimension_names = {}
 
     def output(self):
-        self.create_local_target('compression', file=self.file)
+        return self.create_local_target('compression', file=self.file)
 
     def run(self):
         input = Dataset(self.input().path)
@@ -85,24 +85,33 @@ class GroupCompression(CopyNetcdfFile):
         self.dimension_names[dim_levels *
                              dim_species] = 'combined_atmospheric_grid_levels'
         self.dimension_names[dim_levels] = 'atmospheric_grid_levels'
-        for var_name in self.exclusions:
-            var = input[var_name]
-            # for decomposition, array should be of higher dimension
-            # last two dimensions should be "atmospheric_grid_levels"
-            if var.dimensions[-2:] != ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
-                logger.warning('Only arrays of higher dimension can be decomposed. \
-                    Skipping decomposition of %s', var)
-                continue
-            if var_name.endswith('_n'):
-                # noise matrix. suitable for eigen decomposition
-                self.eigen_decomposition(var, levels)
-            else:
-                self.singular_value_decomposition(
-                    var, dim_species, dim_levels, levels, output)
+        child_groups = self.child_groups(input['state'])
+        for group in filter(lambda g: g.variables, child_groups):
+            for name, var in group.variables.items():
+                # for decomposition, array should be of higher dimension
+                # last two dimensions should be "atmospheric_grid_levels"
+                if var.dimensions[-2:] != ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
+                    self.copy_variable(output, var, group.path)
+                    continue
+                if name.endswith('_n'):
+                    # noise matrix. suitable for eigen decomposition
+                    self.eigen_decomposition(var, levels)
+                else:
+                    self.singular_value_decomposition(
+                        group, var, dim_species, dim_levels, levels, output)
         input.close()
         output.close()
 
-    def singular_value_decomposition(self, var: Variable, dim_species: int, dim_levels: int, nol: np.ma.MaskedArray, output: Dataset) -> np.ma.MaskedArray:
+    def child_groups(self, group: Group):
+        if group.groups:
+            return [group] + [self.child_groups(g) for g in group.groups.values()]
+        else:
+            return group
+
+    def child_variables(self, group: Group) -> List[Tuple['str', Variable]]:
+        return [g.variables.values() for g in self.child_groups(group)]
+
+    def singular_value_decomposition(self, group: Group, var: Variable, dim_species: int, dim_levels: int, nol: np.ma.MaskedArray, output: Dataset) -> np.ma.MaskedArray:
         reshaper = ArrayReshaper(var.shape, dim_levels, dim_species)
         events, upper, lower = reshaper.new_shape()
 
@@ -133,17 +142,19 @@ class GroupCompression(CopyNetcdfFile):
             except ValueError as error:
                 print(error)
         # write all to output
-        path = var.name.replace('_', "/")
         U_dim = (
             'event', self.dimension_names[lower], self.dimension_names[lower])
-        U_out = output.createVariable(f'/{path}/U', 'f', U_dim, zlib=True)
+        U_out = output.createVariable(
+            f'{group.path}/{var.name}/U', 'f', U_dim, zlib=True)
         U_out[:] = all_U[:]
         s_dim = ('event', self.dimension_names[lower])
-        s_out = output.createVariable(f'/{path}/s', 'f', s_dim, zlib=True)
+        s_out = output.createVariable(
+            f'{group.path}/{var.name}/s', 'f', s_dim, zlib=True)
         s_out[:] = all_s[:]
         Vh_dim = (
             'event', self.dimension_names[lower], self.dimension_names[upper])
-        Vh_out = output.createVariable(f'/{path}/Vh', 'f', Vh_dim, zlib=True)
+        Vh_out = output.createVariable(
+            f'{group.path}/{var.name}/Vh', 'f', Vh_dim, zlib=True)
         Vh_out[:] = all_Vh[:]
 
     def select_significant(self, eigenvalues: List, thres=10e-4):

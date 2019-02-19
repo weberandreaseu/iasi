@@ -47,5 +47,7 @@ class TestCompression(unittest.TestCase):
         success = luigi.build([task], local_scheduler=True)
         self.assertTrue(success)
         with Dataset(task.output().path) as nc:
-            vars = nc['state/0/WV'].variables.keys()
-            self.assertIn('atm', vars)
+            vars = nc['/state/WV/atm_avk'].variables.keys()
+            self.assertIn('Vh', vars)
+            self.assertIn('s', vars)
+            self.assertIn('U', vars)

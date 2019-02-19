@@ -19,6 +19,7 @@ class TestAposterioriProcessing(unittest.TestCase):
             df = pd.read_csv(file)
             self.verify_results(df)
 
+    @unittest.skip
     def test_svd_retrieval(self):
         task = SvdAposteriori(
             file='test/resources/IASI-test-single-event.nc',

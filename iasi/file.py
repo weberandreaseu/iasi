@@ -4,7 +4,7 @@ import re
 import luigi
 from luigi import Config
 from luigi.util import common_params, inherits, requires
-from netCDF4 import Dataset
+from netCDF4 import Dataset, Variable
 
 from iasi.util import CustomTask
 
@@ -44,14 +44,19 @@ class CopyNetcdfFile(CustomTask):
             output.createDimension(
                 name, len(dim) if not dim.isunlimited() else None)
 
+    def copy_variable(self,  target: Dataset, var: Variable, path: str = None) -> Variable:
+        if path:
+            out_var = target.createVariable(f'{path}/{var.name}', var.datatype, var.dimensions)
+        else:
+            out_var = target.createVariable(var.name, var.datatype, var.dimensions)
+        out_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
+        out_var[:] = var[:]
+
     def copy_variables(self, input: Dataset, output: Dataset) -> None:
-        # source https://gist.github.com/guziy/8543562
         for name, var in input.variables.items():
             if self.exclusion_pattern and re.match(self.exclusion_pattern, name):
                 continue
-            out_var = output.createVariable(name, var.datatype, var.dimensions)
-            out_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
-            out_var[:] = var[:]
+            self.copy_variable(output, var)
 
 
 class MoveVariables(CopyNetcdfFile):
