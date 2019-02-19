@@ -12,7 +12,7 @@ from iasi.file import CopyNetcdfFile
 
 class CompressionTask(CopyNetcdfFile):
     dim = luigi.IntParameter()
-    exclusions = luigi.ListParameter(default=['state_WVatm_avk'])
+    exclusion_pattern = r"state_WVatm_avk"
 
     def run(self):
         input = Dataset(self.input().path)

@@ -1,10 +1,12 @@
-import luigi
-from iasi.util import CustomTask
-from netCDF4 import Dataset
 import os
-from luigi.util import inherits, requires, common_params
-from luigi import Config
 import re
+
+import luigi
+from luigi import Config
+from luigi.util import common_params, inherits, requires
+from netCDF4 import Dataset
+
+from iasi.util import CustomTask
 
 
 class ReadFile(luigi.ExternalTask):
@@ -24,14 +26,8 @@ class CopyNetcdfFile(CustomTask):
         exclusions  variables to exclude
         format      used netCDF format
     """
-    inclusions = luigi.ListParameter(default=[])
-    exclusions = luigi.ListParameter(default=[])
+    exclusion_pattern = luigi.Parameter(default=None)
     format = luigi.Parameter(default='NETCDF4')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.exclusions and self.inclusions:
-            raise AttributeError('Only inclusions OR exclusions are allowed.')
 
     def output(self):
         return self.create_local_target(file=self.file)
@@ -52,7 +48,7 @@ class CopyNetcdfFile(CustomTask):
     def copy_variables(self, input: Dataset, output: Dataset) -> None:
         # source https://gist.github.com/guziy/8543562
         for name, var in input.variables.items():
-            if name in self.exclusions or (self.inclusions and name not in self.inclusions):
+            if self.exclusion_pattern and re.match(self.exclusion_pattern, name):
                 continue
             out_var = output.createVariable(name, var.datatype, var.dimensions)
             out_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
@@ -61,9 +57,7 @@ class CopyNetcdfFile(CustomTask):
 
 class MoveVariables(CopyNetcdfFile):
 
-    exclusions = []
-
-    var_regex = r"(state)_([A-Z]+\d?)(\S+)"
+    exclusion_pattern = r"(state)_([A-Z]+\d?)(\S+)"
 
     def output(self):
         return self.create_local_target('groups', file=self.file)
@@ -75,18 +69,17 @@ class MoveVariables(CopyNetcdfFile):
         variables = input.variables.keys()
         # exclude all variables matching regex
         matches = list(filter(lambda var: re.match(
-            self.var_regex, var), variables))
+            self.exclusion_pattern, var), variables))
         self.exclusions = matches
         # get components of matching variables e.g. ('state', 'WV', 'atm_avk')
         var_components = map(lambda var: re.match(
-            self.var_regex, var).groups(), matches)
+            self.exclusion_pattern, var).groups(), matches)
         # convert them to paths
         paths = map(lambda vars: os.path.join(*vars), var_components)
         self.copy_dimensions(input, output)
         self.copy_variables(input, output)
         # move remaining variables in subdirectories
         for var, path in zip(matches, paths):
-            print(path)
             original = input.variables[var]
             out_var = output.createVariable(
                 path, original.datatype, original.dimensions)

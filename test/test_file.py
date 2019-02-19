@@ -33,7 +33,7 @@ class TestCopyNetcdf(unittest.TestCase):
             file=self.file,
             dst='/tmp/iasi/copy',
             force=True,
-            inclusions=inclusions
+            exclusion_pattern=r"^((?!state_WVatm+).)*$"
         )
         success = luigi.build([task], local_scheduler=True)
         self.assertTrue(success)
@@ -42,35 +42,21 @@ class TestCopyNetcdf(unittest.TestCase):
             self.assertListEqual(vars, inclusions)
 
     def test_copy_exclusions(self):
-        exclusions = [
-            'Date', 'Time', 'atm_altitude', 'atm_nol',
-            'fit_quality', 'iter', 'lat', 'lon', 'srf_flag'
-        ]
         task = CopyNetcdfFile(
             file=self.file,
             dst='/tmp/iasi/copy',
             force=True,
-            exclusions=exclusions
+            exclusion_pattern=r"state_WV"
         )
         success = luigi.build([task], local_scheduler=True)
         self.assertTrue(success)
         with Dataset(task.output().path, 'r') as nc:
             vars = list(nc.variables.keys())
-            expected = [
+            excluded = [
                 'state_WVatm', 'state_WVatm_a', 'state_WVatm_avk'
             ]
-            self.assertListEqual(vars, expected)
-
-    def test_attribute_error_with_inclusions_and_exclusions(self):
-        self.assertRaises(
-            AttributeError,
-            CopyNetcdfFile,
-            file=self.file,
-            dst='/tmp/iasi/copy',
-            force=True,
-            inclusions=['state_WVatm'],
-            exclusions=['state_WVatm']
-        )
+            for exclusion in excluded:
+                self.assertNotIn(exclusion, vars)
 
     def test_move_variables(self):
         task = MoveVariables(
