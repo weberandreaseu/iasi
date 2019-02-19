@@ -1,7 +1,6 @@
 {
     "python.pythonPath": "venv/bin/python",
     "python.unitTest.unittestArgs": [
-        "-v",
         "-s",
         "./test",
     ],
