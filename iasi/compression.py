@@ -126,11 +126,9 @@ class GroupCompression(CopyNetcdfFile):
                 continue
             # reduce array dimensions
             matrix = reshaper.reshape(var[event][...], level)
-            # decompose reduced array
-            if np.ma.is_masked(matrix):
-                logger.warning(
-                    'Variable %s contains masked values at index %d. Skipping', var.name, event)
+            if not self.matrix_ok(event, var, matrix):
                 continue
+            # decompose reduced array
             U, s, Vh = linalg.svd(matrix.data, full_matrices=False)
             # find k eigenvalues
             sigma = self.select_significant(s)
@@ -162,6 +160,22 @@ class GroupCompression(CopyNetcdfFile):
         most_significant = eigenvalues[0]
         return list(filter(lambda eig: eig > most_significant * thres, eigenvalues))
 
+    def matrix_ok(self, event, var, matrix):
+        ok = True
+        if np.ma.is_masked(matrix):
+            logger.warning(
+                'event %d contains masked values in %s. skipping', event, var.name)
+            ok = False
+        if np.isnan(matrix).any():
+            logger.warning(
+                'event %d contains nan values in %s. skipping', event, var.name)
+            ok = False
+        if np.isinf(matrix).any():
+            logger.warning(
+                'event %d contains inf values in %s. skipping', event, var.name)
+            ok = False
+        return ok
+
     def eigen_decomposition(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
         logger.warning('perform eigen decomposition on %s', var.name)
         reshaper = ArrayReshaper(var.shape, dim_levels, dim_species)
@@ -176,14 +190,12 @@ class GroupCompression(CopyNetcdfFile):
             # reduce array dimensions
             matrix = reshaper.reshape(var[event][...], level)
             # decompose reduced array
-            if np.ma.is_masked(matrix):
-                logger.warning(
-                    'Variable %s contains masked values at index %d. Skipping', var.name, event)
+            if not self.matrix_ok(event, var, matrix):
                 continue
             eigenvalues, eigenvectors = np.linalg.eig(matrix)
             most_significant = self.select_significant(eigenvalues)
             k = len(most_significant)
-            # TODO check for imag values or symmetric property
+            # TODO check for imag values or symmetric property. already happend!
             try:
                 all_Q[event][:eigenvectors.shape[0], :k] = eigenvectors[:, :k]
                 all_s[event][:k] = most_significant
