@@ -1,18 +1,24 @@
+import logging as logger
 import os
 from math import ceil
-from typing import Tuple, List, Dict
+from typing import Dict, List, Tuple
 
 import luigi
 import numpy as np
-from netCDF4 import Dataset, Variable, Group
+from luigi.util import common_params, inherits, requires
+from netCDF4 import Dataset, Group, Variable
 from scipy import linalg
-import logging as logger
-from iasi.file import CopyNetcdfFile
+
+from iasi.file import CopyNetcdfFile, MoveVariables
 
 
+@requires(MoveVariables)
 class CompressionTask(CopyNetcdfFile):
     dim = luigi.IntParameter()
-    exclusion_pattern = r"state_WVatm_avk"
+    exclusion_pattern = r"state"
+
+    def output(self):
+        self.create_local_target('compression', file=self.file)
 
     def run(self):
         input = Dataset(self.input().path)
@@ -26,8 +32,8 @@ class CompressionTask(CopyNetcdfFile):
         species = input.dimensions['atmospheric_species'].size
         # create three components
         self.create_variables(output, grid_levels)
-        avk = input.variables['state_WVatm_avk'][...]
-        nol = input.variables['atm_nol'][...]
+        avk = input['/state/WV/atm_avk'][...]
+        nol = input['atm_nol'][...]
         # decompose average kernel for each event
         for event in range(events):
             for row in range(species):
@@ -54,24 +60,15 @@ class CompressionTask(CopyNetcdfFile):
         raise NotImplementedError
 
 
-class GroupCompression(CompressionTask):
+@requires(MoveVariables)
+class GroupCompression(CopyNetcdfFile):
 
-    state_group = [
-        'state_GHGatm', 'state_GHGatm_a',
-        'state_HNO3atm', 'state_HNO3atm_a',
-        'state_Tatm', 'state_Tatm_a',
-        'state_WVatm', 'state_WVatm_a'
-    ]
-
-    exclusions = [
-        'state_GHGatm_n', 'state_GHGatm_avk',
-        'state_Tatm2GHGatm_xavk', 'state_HNO3atm_n',
-        'state_HNO3atm_avk', 'state_Tatm2HNO3atm_xavk',
-        'state_Tatm_n', 'state_WVatm_avk',
-        'state_Tatm2WVatm_xavk', 'state_Tatm_avk', 'state_WVatm_n'
-    ]
+    exclusion_pattern = r"state"
 
     dimension_names = {}
+
+    def output(self):
+        self.create_local_target('compression', file=self.file)
 
     def run(self):
         input = Dataset(self.input().path)
@@ -111,7 +108,8 @@ class GroupCompression(CompressionTask):
 
         all_U = np.ma.masked_all((events, lower, lower))
         all_s = np.ma.masked_all((events, lower))
-        all_Vh = np.ma.masked_all((events, upper, upper))
+        # TODO (upper, upper) or (lower, upper)?
+        all_Vh = np.ma.masked_all((events, lower, upper))
         for event in range(var.shape[0]):
             level = nol[event]
             if np.ma.is_masked(level):
@@ -144,7 +142,7 @@ class GroupCompression(CompressionTask):
         s_out = output.createVariable(f'/{path}/s', 'f', s_dim, zlib=True)
         s_out[:] = all_s[:]
         Vh_dim = (
-            'event', self.dimension_names[upper], self.dimension_names[upper])
+            'event', self.dimension_names[lower], self.dimension_names[upper])
         Vh_out = output.createVariable(f'/{path}/Vh', 'f', Vh_dim, zlib=True)
         Vh_out[:] = all_Vh[:]
 
@@ -200,16 +198,16 @@ class EigenDecomposition(CompressionTask):
         # np.testing.assert_allclose(np.imag(eigenvalues[:dim]), 0)
         Q = np.real(eigenvectors[:, :dim])
         s = np.real(eigenvalues[:dim])
-        output['state_WVatm_avk_Q'][event, row, column, :levels, :dim] = Q
-        output['state_WVatm_avk_s'][event, row, column, :dim] = s
+        output['/state/WV/atm_avk/Q'][event, row, column, :levels, :dim] = Q
+        output['/state/WV/atm_avk/s'][event, row, column, :dim] = s
 
     def create_variables(self, dataset: Dataset, grid_levels: int) -> None:
-        Q = dataset.createVariable('state_WVatm_avk_Q', 'f8',
+        Q = dataset.createVariable('/state/WV/atm_avk/Q', 'f8',
                                    ('event', 'atmospheric_species', 'atmospheric_species',
                                     'atmospheric_grid_levels', 'kernel_eigenvalues'),
                                    fill_value=-9999.9)
         Q.description = "Eigenvectors of eigen decomposition"
-        s = dataset.createVariable('state_WVatm_avk_s', 'f8',
+        s = dataset.createVariable('/state/WV/atm_avk/s', 'f8',
                                    ('event', 'atmospheric_species',
                                     'atmospheric_species', 'kernel_eigenvalues'),
                                    fill_value=-9999.9)
@@ -226,24 +224,24 @@ class SingularValueDecomposition(CompressionTask):
         U = U[:, :dim]
         s = s[:dim]
         Vh = Vh[:dim, :]
-        output['state_WVatm_avk_U'][event, row,
-                                    column, : levels, : dim] = U
-        output['state_WVatm_avk_s'][event, row, column, : dim] = s
-        output['state_WVatm_avk_Vh'][event, row,
-                                     column, : dim, : levels] = Vh
+        output['/state/WV/atm_avk/U'][event, row,
+                                      column, : levels, : dim] = U
+        output['/state/WV/atm_avk/s'][event, row, column, : dim] = s
+        output['/state/WV/atm_avk/Vh'][event, row,
+                                       column, : dim, : levels] = Vh
 
     def create_variables(self, dataset: Dataset, grid_levels: int) -> None:
-        U = dataset.createVariable('state_WVatm_avk_U', 'f8',
+        U = dataset.createVariable('/state/WV/atm_avk/U', 'f8',
                                    ('event', 'atmospheric_species', 'atmospheric_species',
                                     'atmospheric_grid_levels', 'kernel_eigenvalues'),
                                    fill_value=-9999.9)
         U.description = "U component of singular value decomposition"
-        s = dataset.createVariable('state_WVatm_avk_s', 'f8',
+        s = dataset.createVariable('/state/WV/atm_avk/s', 'f8',
                                    ('event', 'atmospheric_species',
                                     'atmospheric_species', 'kernel_eigenvalues'),
                                    fill_value=-9999.9)
         s.description = "Eigenvalues (sigma) of singular value decomposition"
-        Vh = dataset.createVariable('state_WVatm_avk_Vh', 'f8',
+        Vh = dataset.createVariable('/state/WV/atm_avk/Vh', 'f8',
                                     ('event', 'atmospheric_species', 'atmospheric_species',
                                      'kernel_eigenvalues', 'atmospheric_grid_levels'),
                                     fill_value=-9999.9)

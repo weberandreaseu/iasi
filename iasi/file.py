@@ -22,9 +22,8 @@ class CopyNetcdfFile(CustomTask):
     """Luigi Task for copying netCDF files with a subset of variables
 
     Attributes:
-        inclusions  variables to include
-        exclusions  variables to exclude
-        format      used netCDF format
+        exclusion_pattern   variables matching pattern are excluded
+        format              used netCDF format
     """
     exclusion_pattern = luigi.Parameter(default=None)
     format = luigi.Parameter(default='NETCDF4')
