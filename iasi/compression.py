@@ -80,10 +80,10 @@ class GroupCompression(CopyNetcdfFile):
         dim_species = input.dimensions['atmospheric_species'].size
         state = output.createGroup('state')
         state.createDimension(
-            'combined_atmospheric_grid_levels', dim_levels * dim_species)
+            'double_atmospheric_grid_levels', dim_levels * dim_species)
         self.dimension_names[dim_species] = 'atmospheric_species'
         self.dimension_names[dim_levels *
-                             dim_species] = 'combined_atmospheric_grid_levels'
+                             dim_species] = 'double_atmospheric_grid_levels'
         self.dimension_names[dim_levels] = 'atmospheric_grid_levels'
         child_groups = self.child_groups(input['state'])
         for group in filter(lambda g: g.variables, child_groups):

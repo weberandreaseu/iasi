@@ -28,6 +28,7 @@ class TestComposition(unittest.TestCase):
             dst='/tmp/iasi'
             # force=True
         )
+        luigi.build([cls.task], local_scheduler=True)
 
     def test_compression_output_exists(self):
         path = self.task.output().path
@@ -40,8 +41,11 @@ class TestComposition(unittest.TestCase):
     def test_eigen_composition(self):
         with Dataset(self.task.output().path) as nc:
             atm_n = nc['/state/WV/atm_n']
+            nol = nc['atm_nol']
             self.assertIsInstance(atm_n, Group)
             eig = EigenCompositon(atm_n)
+            array = eig.reconstruct(nol)
+            # self.assertTupleEqual(array.shape, (1, 2, 2, nol[0], nol[0]))
 
     @unittest.skip
     def test_group_compression(self):
