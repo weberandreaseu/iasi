@@ -177,7 +177,6 @@ class GroupCompression(CopyNetcdfFile):
         return ok
 
     def eigen_decomposition(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
-        logger.warning('perform eigen decomposition on %s', var.name)
         reshaper = ArrayReshaper(var.shape, dim_levels, dim_species)
         # should be always the same because reshaped variable is square
         events, matrix_size, _ = reshaper.new_shape()
