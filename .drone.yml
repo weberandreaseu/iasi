@@ -6,7 +6,7 @@ steps:
   image: jupyter/scipy-notebook
   pull: always
   commands:
-  - pip install -r requirements.txt
+  - /bin/bash script/setup.sh
   - python -m unittest discover -v -s ./test
 - name: integration test
   image: jupyter/scipy-notebook
@@ -15,10 +15,8 @@ steps:
     - name: data
       path: data
   commands:
-    - ls -la
-    - ls -la data
-#   - pip install -r requirements.txt
-#   - python -m unittest discover -s ./test -p "integration*.py"
+  - /bin/bash script/setup.sh
+  - python -m unittest discover -s ./test -p "integration*.py"
 
 volumes:
 - name: data

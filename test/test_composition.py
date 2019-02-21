@@ -4,6 +4,9 @@ import sys
 import unittest
 from typing import Tuple
 
+import warnings
+
+
 import luigi
 import numpy as np
 from netCDF4 import Dataset, Group, Variable
@@ -16,7 +19,6 @@ handler = logging.StreamHandler(stream=sys.stdout)
 handler.setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
-# logger.basicConfig(level=logging.DEBUG)
 logger.setLevel(logging.DEBUG)
 
 
@@ -27,11 +29,13 @@ class TestComposition(unittest.TestCase):
         # make sure there is a compressed file for testing purpose
         compression = GroupCompression(
             file=file,
-            dst='/tmp/iasi'
+            dst='/tmp/iasi',
+            force=True
         )
         uncompressed = MoveVariables(
             file=file,
-            dst='/tmp/iasi'
+            dst='/tmp/iasi',
+            force=True
         )
         luigi.build([compression, uncompressed], local_scheduler=True)
         cls.compressed = Dataset(compression.output().path)
@@ -62,7 +66,11 @@ class TestComposition(unittest.TestCase):
         # reconstruction should contain unmasked vales
         self.assertFalse(reconstruction.mask.all())
         # masked values are ignored for comprison
-        np.allclose(reconstruction, original)
+        self.assertFalse(np.isnan(reconstruction[:, :28, :28]).any(
+        ), 'Reconstructed array contains nans')
+        self.assertFalse(np.isinf(reconstruction[:, :28, :28]).any(
+        ), 'Reconstructed array contains inf')
+        np.allclose(reconstruction.data, original.data)
 
     @unittest.skip
     def test_group_compression(self):

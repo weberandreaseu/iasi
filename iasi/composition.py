@@ -29,10 +29,10 @@ class EigenCompositon:
     def reconstruct(self, nol: np.ma.MaskedArray) -> np.ma.MaskedArray:
         # determine if variable is composed by quadrants -> dimension of output
         quadrant: Quadrant = Quadrant.for_disassembly(self.Q)
-        result = np.ma.masked_all(self.Q.shape)
+        result = np.ma.masked_all(self.Q.shape, dtype=np.float32)
         # iterate over events
         for event in range(self.Q.shape[0]):
             Q = self.Q[event][...]
             s = self.s[event][...]
-            result[event] = Q @ np.diag(s) @ Q.T
+            result[event] = (Q * s).dot(Q.T)
         return np.reshape(result, quadrant.disassembly_shape())
