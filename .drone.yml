@@ -2,12 +2,25 @@ kind: pipeline
 name: default
 
 steps:
-- name: iasi
+- name: test
   image: jupyter/scipy-notebook
+  pull: always
   commands:
   - pip install -r requirements.txt
   - python -m unittest discover -v -s ./test
-  when:
-    event:
-    - push
-    - pull-request
+- name: integration test
+  image: jupyter/scipy-notebook
+  pull: always
+  volumes:
+    - name: data
+      path: data
+  commands:
+    - ls -la
+    - ls -la data
+#   - pip install -r requirements.txt
+#   - python -m unittest discover -s ./test -p "integration*.py"
+
+volumes:
+- name: data
+  host:
+    path: /home/andreas/projects/motiv/data
