@@ -46,9 +46,6 @@ class TestComposition(unittest.TestCase):
         cls.compressed.close()
         cls.uncompressed.close()
 
-    def test_singular_value_composition(self):
-        pass
-
     def test_eigen_composition_combined(self):
         self.verify_eigen_composition('/state/WV/atm_n', (1, 2, 2, 29, 29))
 
@@ -65,27 +62,35 @@ class TestComposition(unittest.TestCase):
         original = self.uncompressed[attribute][...]
         # reconstruction should contain unmasked vales
         self.assertFalse(reconstruction.mask.all())
-        # masked values are ignored for comprison
         self.assertFalse(np.isnan(reconstruction[:, :28, :28]).any(
         ), 'Reconstructed array contains nans')
         self.assertFalse(np.isinf(reconstruction[:, :28, :28]).any(
         ), 'Reconstructed array contains inf')
         np.allclose(reconstruction.data, original.data)
 
-    @unittest.skip
-    def test_group_compression(self):
-        task = Compositon(
-            file='test/resources/MOTIV-single-event.nc',
-            dst='/tmp/iasi',
-            force=True
-        )
-        success = luigi.build([task], local_scheduler=True)
-        self.assertTrue(success)
-        # with Dataset(task.output().path) as nc:
-        #     vars = nc['/state/WV/atm_avk'].variables.keys()
-        #     self.assertIn('Vh', vars)
-        #     self.assertIn('s', vars)
-        #     self.assertIn('U', vars)
-        #     vars = nc['/state/WV/atm_n'].variables.keys()
-        #     self.assertIn('Q', vars)
-        #     self.assertIn('s', vars)
+    def test_svd_one_quadrant(self):
+        self.verify_singular_value_composition(
+            'state/HNO3/atm_avk', (1, 29, 29))
+
+    def test_svd_two_quadrants(self):
+        self.verify_singular_value_composition(
+            'state/T/atm2GHGatm_xavk', (1, 2, 29, 29))
+
+    def test_svd_four_quadrants(self):
+        self.verify_singular_value_composition(
+            'state/WV/atm_avk', (1, 2, 2, 29, 29))
+
+    def verify_singular_value_composition(self, arrtribute: str, shape: Tuple):
+        avk = self.compressed[arrtribute]
+        self.assertIsInstance(avk, Group)
+        svc = SingularValueComposition(avk)
+        reconstruction = svc.reconstruct(None)
+        self.assertTupleEqual(reconstruction.shape, shape)
+        original = self.uncompressed['state/WV/atm_avk'][...]
+        # reconstruction should contain unmasked vales
+        self.assertFalse(reconstruction.mask.all())
+        self.assertFalse(np.isnan(reconstruction[:, :28, :28]).any(
+        ), 'Reconstructed array contains nans')
+        self.assertFalse(np.isinf(reconstruction[:, :28, :28]).any(
+        ), 'Reconstructed array contains inf')
+        np.allclose(reconstruction.data, original.data)

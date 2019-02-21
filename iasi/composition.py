@@ -14,8 +14,21 @@ class Compositon(CopyNetcdfFile):
 class SingularValueComposition:
 
     def __init__(self, group: Group):
-        # assert group contains U, s, VH
-        pass
+        vars = group.variables.keys()
+        assert 'U' in vars and 's' in vars and 'Vh' in vars
+        self.U = group['U']
+        self.s = group['s']
+        self.Vh = group['Vh']
+
+    def reconstruct(self, nol: np.ma.MaskedArray) -> np.ma.MaskedArray:
+        quadrant: Quadrant = Quadrant.for_disassembly(self.Vh)
+        result = np.ma.masked_all(self.Vh.shape, dtype=np.float32)
+        for event in range(self.Vh.shape[0]):
+            U = self.U[event][...]
+            s = self.s[event][...]
+            Vh = self.Vh[event][...]
+            result[event] = (U * s).dot(Vh)
+        return np.reshape(result, quadrant.disassembly_shape())
 
 
 class EigenCompositon:
