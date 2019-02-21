@@ -3,6 +3,7 @@ from luigi.util import requires
 from netCDF4 import Dataset, Group, Variable
 
 from iasi.file import CopyNetcdfFile, MoveVariables
+from iasi.util import Quadrant
 
 
 @requires(MoveVariables)
@@ -22,16 +23,16 @@ class EigenCompositon:
     def __init__(self, group: Group):
         vars = group.variables.keys()
         assert 'Q' in vars and 's' in vars
-        # if 'double_atmospheric_grid_levels' in group['Q'].dimenisons:
-        #     pass
-
         self.Q = group['Q']
-        self.s = group['s'][...]
+        self.s = group['s']
 
-    def reconstruct(self, nol: np.ma.MaskedArray) -> np.ndarray:
-        print(self.Q.dimensions)
+    def reconstruct(self, nol: np.ma.MaskedArray) -> np.ma.MaskedArray:
         # determine if variable is composed by quadrants -> dimension of output
-        # allocate ndarray with shape
+        quadrant: Quadrant = Quadrant.for_disassembly(self.Q)
+        result = np.ma.masked_all(self.Q.shape)
         # iterate over events
-        # decompose matrix for each event
-        # if quadrants, get 4 quadrants
+        for event in range(self.Q.shape[0]):
+            Q = self.Q[event][...]
+            s = self.s[event][...]
+            result[event] = Q @ np.diag(s) @ Q.T
+        return np.reshape(result, quadrant.disassembly_shape())

@@ -78,13 +78,16 @@ class Quadrant:
     def assemble(self, array: np.ma.MaskedArray, levels: int):
         return array[:levels, :levels]
 
-    def disassemble(self):
-        raise NotImplementedError
+    def disassemble(self, array: np.ma.MaskedArray, levels: int):
+        return array[:levels, :levels]
 
     def create_variable(self, output: Dataset):
         raise NotImplementedError
 
-    def updated_shape(self):
+    def assembly_shape(self):
+        return self.var.shape
+
+    def disassembly_shape(self):
         return self.var.shape
 
 
@@ -98,9 +101,17 @@ class TwoQuadrants(Quadrant):
     def assemble(self, array: np.ma.MaskedArray, levels: int):
         return np.block([array[0, :levels, :levels], array[1, :levels, :levels]])
 
-    def updated_shape(self):
+    def assembly_shape(self):
         grid_levels = self.var.shape[3]
         return (self.var.shape[0], grid_levels, grid_levels * 2)
+
+    def disassembly_shape(self):
+        grid_levels = self.var.shape[1]
+        return (self.var.shape[0], 2, grid_levels, grid_levels)
+
+    def disassemble(self, array: np.ma.MaskedArray, levels: int):
+        reshape = self.disassembly_shape()[1:]
+        return np.reshape(array, reshape)[:, :levels, :levels]
 
 
 class FourQuadrants(Quadrant):
@@ -116,6 +127,14 @@ class FourQuadrants(Quadrant):
             [array[1, 0, :levels, :levels], array[1, 1, :levels, :levels]]
         ])
 
-    def updated_shape(self):
+    def assembly_shape(self):
         grid_levels = self.var.shape[4]
         return (self.var.shape[0], grid_levels * 2, grid_levels * 2)
+
+    def disassembly_shape(self):
+        grid_levels = self.var.shape[2]
+        return (self.var.shape[0], 2, 2, int(grid_levels / 2), int(grid_levels / 2))
+
+    def disassemble(self, array: np.ma.MaskedArray, levels: int):
+        reshape = self.disassembly_shape()[1:]
+        return np.reshape(array, reshape)[:, :, :levels, :levels]
