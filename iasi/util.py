@@ -2,7 +2,7 @@ import os
 
 import luigi
 from luigi.util import inherits, requires
-from netCDF4 import Dataset, Variable
+from netCDF4 import Dataset, Variable, Group
 import numpy as np
 from typing import List
 
@@ -33,6 +33,19 @@ class ForceableTask(luigi.Task):
                 tasks.pop(0)
                 if len(tasks) == 0:
                     done = True
+
+
+def child_groups_of(group: Group):
+    yield group
+    if group.groups:
+        for subgroup in group.groups.values():
+            yield from child_groups_of(subgroup)
+
+
+def child_variables_of(group: Group):
+    for subgroup in child_groups_of(group):
+        for variable in subgroup.variables.values():
+            yield (subgroup, variable)
 
 
 class CustomTask(ForceableTask):

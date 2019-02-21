@@ -5,7 +5,7 @@ from iasi.util import CustomTask
 from iasi import GroupCompression, MoveVariables
 import luigi
 from netCDF4 import Dataset, Variable, Group
-from iasi.util import Quadrant, TwoQuadrants, FourQuadrants
+from iasi.util import Quadrant, TwoQuadrants, FourQuadrants, child_variables_of, child_groups_of
 import numpy as np
 
 
@@ -40,6 +40,18 @@ class TestQuadrants(unittest.TestCase):
         cls.compressed.close()
         cls.uncompressed.close()
 
+    def test_child_groups(self):
+        state = self.uncompressed['state']
+        children = child_groups_of(state)
+        names = [g.name for g in children]
+        self.assertListEqual(names, ['state', 'GHG',  'T', 'HNO3', 'WV'])
+
+    def test_variables_of_group(self):
+        wv = self.uncompressed['state/WV']
+        self.assertIsInstance(wv, Group)
+        children = [var.name for g, var in child_variables_of(wv)]
+        self.assertListEqual(children, ['atm', 'atm_a', 'atm_n', 'atm_avk'])
+
     def test_single_quadrant_assembly(self):
         avk = self.uncompressed['/state/HNO3/atm_avk']
         q: Quadrant = Quadrant.for_assembly(avk)
@@ -47,7 +59,7 @@ class TestQuadrants(unittest.TestCase):
         array = np.random.uniform(size=(29, 29))
         assembly = q.assemble(array, 23)
         self.assertTupleEqual(assembly.shape, (23, 23))
-        self.assertTrue(np.allclose(array[:23, :23], assembly))
+        self.assertTrue(np.allclose(array[: 23, : 23], assembly))
 
     def test_two_quadrants_assembly(self):
         xavk = self.uncompressed['/state/T/atm2GHGatm_xavk']

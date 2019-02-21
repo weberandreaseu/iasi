@@ -10,6 +10,7 @@ from netCDF4 import Dataset, Group, Variable
 from scipy import linalg
 
 from iasi.file import CopyNetcdfFile, MoveVariables
+from iasi.util import child_groups_of, child_variables_of
 
 
 @requires(MoveVariables)
@@ -85,32 +86,24 @@ class GroupCompression(CopyNetcdfFile):
         self.dimension_names[dim_levels *
                              dim_species] = 'double_atmospheric_grid_levels'
         self.dimension_names[dim_levels] = 'atmospheric_grid_levels'
-        child_groups = self.child_groups(input['state'])
-        for group in filter(lambda g: g.variables, child_groups):
-            for name, var in group.variables.items():
-                # for decomposition, array should be of higher dimension
-                # last two dimensions should be "atmospheric_grid_levels"
-                if var.dimensions[-2:] != ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
-                    self.copy_variable(output, var, group.path)
-                    continue
-                if name.endswith('atm_n'):
+        for group, var in child_variables_of(input['state']):
+            # for decomposition, array should be of higher dimension
+            # last two dimensions should be "atmospheric_grid_levels"
+            if var.dimensions[-2:] != ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
+                self.copy_variable(output, var, group.path)
+                continue
+            if var.name.endswith('atm_n'):
                     # noise matrix. suitable for eigen decomposition
-                    self.eigen_decomposition(
-                        output, group, var, levels, dim_species, dim_levels)
-                else:
-                    self.singular_value_decomposition(
-                        group, var, dim_species, dim_levels, levels, output)
+                self.eigen_decomposition(
+                    output, group, var, levels, dim_species, dim_levels)
+            else:
+                self.singular_value_decomposition(
+                    group, var, dim_species, dim_levels, levels, output)
         input.close()
         output.close()
 
-    def child_groups(self, group: Group):
-        if group.groups:
-            return [group] + [self.child_groups(g) for g in group.groups.values()]
-        else:
-            return group
-
     # def child_variables(self, group: Group) -> List[Tuple['str', Variable]]:
-    #     return [g.variables.values() for g in self.child_groups(group)]
+    #     return [g.variables.values() for g in child_groups_of(group)]
 
     def singular_value_decomposition(self, group: Group, var: Variable, dim_species: int, dim_levels: int, nol: np.ma.MaskedArray, output: Dataset) -> np.ma.MaskedArray:
         reshaper = ArrayReshaper(var.shape, dim_levels, dim_species)

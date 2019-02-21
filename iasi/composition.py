@@ -8,7 +8,10 @@ from iasi.util import Quadrant
 
 @requires(MoveVariables)
 class Compositon(CopyNetcdfFile):
-    pass
+    
+    def run(self):
+        pass
+        #
 
 
 class SingularValueComposition:
