@@ -1,8 +1,8 @@
-numpy
-pandas
-matplotlib
-jupyter
-netcdf4
-scipy
-luigi
-sklearn
+numpy==1.16.1
+pandas==0.24.1
+matplotlib==3.0.2
+jupyter==1.0.0
+scipy==1.2.1
+luigi==2.8.3
+sklearn==0.0
+netcdf4==1.4.2
