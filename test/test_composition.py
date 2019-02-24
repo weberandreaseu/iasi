@@ -11,8 +11,8 @@ import luigi
 import numpy as np
 from netCDF4 import Dataset, Group, Variable
 
-from iasi import Compositon, GroupCompression, MoveVariables
-from iasi.composition import EigenCompositon, SingularValueComposition
+from iasi import Composition, GroupCompression, MoveVariables
+from iasi.composition import EigenComposition, SingularValueComposition
 
 # TODO project wide logging configuration
 handler = logging.StreamHandler(stream=sys.stdout)
@@ -46,6 +46,9 @@ class TestComposition(unittest.TestCase):
         cls.compressed.close()
         cls.uncompressed.close()
 
+    def masks_equal(self, a, b: np.ma.MaskedArray) -> bool:
+        return np.equal(a.mask, b.mask).all()
+
     def test_eigen_composition_combined(self):
         self.verify_eigen_composition('/state/WV/atm_n', (1, 2, 2, 29, 29))
 
@@ -54,9 +57,9 @@ class TestComposition(unittest.TestCase):
 
     def verify_eigen_composition(self, attribute: str, shape: Tuple):
         array = self.compressed[attribute]
-        nol = self.compressed['atm_nol']
+        nol = self.compressed['atm_nol'][...]
         self.assertIsInstance(array, Group)
-        eig = EigenCompositon(array)
+        eig = EigenComposition(array)
         reconstruction = eig.reconstruct(nol)
         self.assertTupleEqual(reconstruction.shape, shape)
         original = self.uncompressed[attribute][...]
@@ -67,6 +70,7 @@ class TestComposition(unittest.TestCase):
         self.assertFalse(np.isinf(reconstruction[:, :28, :28]).any(
         ), 'Reconstructed array contains inf')
         np.allclose(reconstruction.data, original.data)
+        self.assertTrue(self.masks_equal(reconstruction, original))
 
     def test_svd_one_quadrant(self):
         self.verify_singular_value_composition(
@@ -84,7 +88,8 @@ class TestComposition(unittest.TestCase):
         avk = self.compressed[arrtribute]
         self.assertIsInstance(avk, Group)
         svc = SingularValueComposition(avk)
-        reconstruction = svc.reconstruct(None)
+        nol = self.compressed['atm_nol'][...]
+        reconstruction = svc.reconstruct(nol)
         self.assertTupleEqual(reconstruction.shape, shape)
         original = self.uncompressed['state/WV/atm_avk'][...]
         # reconstruction should contain unmasked vales
@@ -94,3 +99,4 @@ class TestComposition(unittest.TestCase):
         self.assertFalse(np.isinf(reconstruction[:, :28, :28]).any(
         ), 'Reconstructed array contains inf')
         np.allclose(reconstruction.data, original.data)
+        self.assertTrue(self.masks_equal(reconstruction, original))

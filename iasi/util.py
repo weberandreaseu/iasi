@@ -103,6 +103,9 @@ class Quadrant:
     def disassembly_shape(self):
         return self.var.shape
 
+    def assign_disassembly(self, of, to, l):
+        to[:l, :l] = of[:l, :l]
+
 
 class TwoQuadrants(Quadrant):
 
@@ -122,9 +125,13 @@ class TwoQuadrants(Quadrant):
         grid_levels = self.var.shape[1]
         return (self.var.shape[0], 2, grid_levels, grid_levels)
 
-    def disassemble(self, array: np.ma.MaskedArray, levels: int):
-        reshape = self.disassembly_shape()[1:]
-        return np.reshape(array, reshape)[:, :levels, :levels]
+    def disassemble(self, array: np.ma.MaskedArray, l: int):
+        d = self.var.shape[1]
+        return np.array([array[:l, :l], array[:l, d:d + l]])
+
+    def assign_disassembly(self, of, to, l):
+        to[0, :l, :l] = of[:l, :l]
+        to[1, :l, :l] = of[:l, l:2*l]
 
 
 class FourQuadrants(Quadrant):
@@ -145,9 +152,21 @@ class FourQuadrants(Quadrant):
         return (self.var.shape[0], grid_levels * 2, grid_levels * 2)
 
     def disassembly_shape(self):
-        grid_levels = self.var.shape[2]
-        return (self.var.shape[0], 2, 2, int(grid_levels / 2), int(grid_levels / 2))
+        grid_levels = int(self.var.shape[2] / 2)
+        return (self.var.shape[0], 2, 2, grid_levels, grid_levels)
 
-    def disassemble(self, array: np.ma.MaskedArray, levels: int):
-        reshape = self.disassembly_shape()[1:]
-        return np.reshape(array, reshape)[:, :, :levels, :levels]
+    def disassemble(self, a: np.ma.MaskedArray, l: int):
+        d = int(self.var.shape[2] / 2)
+        return np.array([
+            [a[:l, :l], a[:l, d:d + l]],
+            [a[d:d + l, :l], a[d:d + l, d:d + l]]
+        ])
+
+    def assign_disassembly(self, of, to, l):
+        to[0, 0, :l, :l] = of[:l, :l]
+        to[0, 1, :l, :l] = of[:l, l:2*l]
+        to[1, 0, :l, :l] = of[l:2*l, :l]
+        to[1, 1, :l, :l] = of[l:2*l, l:2*l]
+
+    # def slice(levels: int):
+    #     return slice()
