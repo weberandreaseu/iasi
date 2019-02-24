@@ -2,7 +2,7 @@ import os
 import unittest
 
 from iasi.util import CustomTask
-from iasi import GroupCompression, MoveVariables
+from iasi import CompressDataset, MoveVariables
 import luigi
 from netCDF4 import Dataset, Variable, Group
 from iasi.util import Quadrant, TwoQuadrants, FourQuadrants, child_variables_of, child_groups_of
@@ -23,7 +23,7 @@ class TestQuadrants(unittest.TestCase):
     def setUpClass(cls):
         file = 'test/resources/MOTIV-single-event.nc'
         # make sure there is a compressed file for testing purpose
-        compression = GroupCompression(
+        compression = CompressDataset(
             file=file,
             dst='/tmp/iasi'
         )

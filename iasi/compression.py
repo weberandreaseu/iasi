@@ -14,55 +14,7 @@ from iasi.util import child_groups_of, child_variables_of
 
 
 @requires(MoveVariables)
-class CompressionTask(CopyNetcdfFile):
-    dim = luigi.IntParameter()
-    exclusion_pattern = r"state"
-
-    def output(self):
-        self.create_local_target('compression', file=self.file)
-
-    def run(self):
-        input = Dataset(self.input().path)
-        output = Dataset(self.output().path, 'w', format=self.format)
-        output.createDimension('kernel_eigenvalues', self.dim)
-        self.copy_dimensions(input, output)
-        self.copy_variables(input, output)
-        # get relevant dimensions
-        events = input.dimensions['event'].size
-        grid_levels = input.dimensions['atmospheric_grid_levels'].size
-        species = input.dimensions['atmospheric_species'].size
-        # create three components
-        self.create_variables(output, grid_levels)
-        avk = input['/state/WV/atm_avk'][...]
-        nol = input['atm_nol'][...]
-        # decompose average kernel for each event
-        for event in range(events):
-            for row in range(species):
-                for column in range(species):
-                    levels = nol[event]
-                    # TODO: clarify when input is assumed as valid
-                    if np.ma.is_masked(levels):
-                        continue
-                    levels = int(levels)
-                    kernel = avk[event, row, column, :levels, :levels]
-                    if np.ma.is_masked(kernel):
-                        continue
-                    # reduce dimension to given number of eigenvalues
-                    # max number of eigenvalues is number of levels
-                    dim = min(self.dim, levels)
-                    if np.isnan(kernel.data).any() or np.isinf(kernel.data).any():
-                        continue
-                    self.decompose(output, kernel.data, event,
-                                   row, column, levels, dim)
-        input.close()
-        output.close()
-
-    def decompose(self, output: Dataset, kernel: np.ndarray, event: int, row: int, column: int, levels: int, dim: int):
-        raise NotImplementedError
-
-
-@requires(MoveVariables)
-class GroupCompression(CopyNetcdfFile):
+class CompressDataset(CopyNetcdfFile):
 
     exclusion_pattern = r"state"
 
@@ -204,6 +156,53 @@ class GroupCompression(CopyNetcdfFile):
             f'{group.path}/{var.name}/s', 'f', s_dim, zlib=True)
         s_out[:] = all_s[:]
 
+
+@requires(MoveVariables)
+class CompressionTask(CopyNetcdfFile):
+    dim = luigi.IntParameter()
+    exclusion_pattern = r"state"
+
+    def output(self):
+        self.create_local_target('compression', file=self.file)
+
+    def run(self):
+        input = Dataset(self.input().path)
+        output = Dataset(self.output().path, 'w', format=self.format)
+        output.createDimension('kernel_eigenvalues', self.dim)
+        self.copy_dimensions(input, output)
+        self.copy_variables(input, output)
+        # get relevant dimensions
+        events = input.dimensions['event'].size
+        grid_levels = input.dimensions['atmospheric_grid_levels'].size
+        species = input.dimensions['atmospheric_species'].size
+        # create three components
+        self.create_variables(output, grid_levels)
+        avk = input['/state/WV/atm_avk'][...]
+        nol = input['atm_nol'][...]
+        # decompose average kernel for each event
+        for event in range(events):
+            for row in range(species):
+                for column in range(species):
+                    levels = nol[event]
+                    # TODO: clarify when input is assumed as valid
+                    if np.ma.is_masked(levels):
+                        continue
+                    levels = int(levels)
+                    kernel = avk[event, row, column, :levels, :levels]
+                    if np.ma.is_masked(kernel):
+                        continue
+                    # reduce dimension to given number of eigenvalues
+                    # max number of eigenvalues is number of levels
+                    dim = min(self.dim, levels)
+                    if np.isnan(kernel.data).any() or np.isinf(kernel.data).any():
+                        continue
+                    self.decompose(output, kernel.data, event,
+                                   row, column, levels, dim)
+        input.close()
+        output.close()
+
+    def decompose(self, output: Dataset, kernel: np.ndarray, event: int, row: int, column: int, levels: int, dim: int):
+        raise NotImplementedError
 
 class ArrayReshaper:
 

@@ -11,7 +11,7 @@ import luigi
 import numpy as np
 from netCDF4 import Dataset, Group, Variable
 
-from iasi import Composition, GroupCompression, MoveVariables
+from iasi import Composition, CompressDataset, MoveVariables
 from iasi.composition import EigenComposition, SingularValueComposition
 
 # TODO project wide logging configuration
@@ -27,7 +27,7 @@ class TestComposition(unittest.TestCase):
     def setUpClass(cls):
         file = 'test/resources/MOTIV-single-event.nc'
         # make sure there is a compressed file for testing purpose
-        compression = GroupCompression(
+        compression = CompressDataset(
             file=file,
             dst='/tmp/iasi',
             force=True

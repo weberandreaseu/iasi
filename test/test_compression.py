@@ -4,7 +4,7 @@ import luigi
 import numpy as np
 from netCDF4 import Dataset
 
-from iasi import EigenDecomposition, GroupCompression, SingularValueDecomposition
+from iasi import EigenDecomposition, CompressDataset, SingularValueDecomposition
 
 
 class TestCompression(unittest.TestCase):
@@ -39,7 +39,7 @@ class TestCompression(unittest.TestCase):
             self.assertIn('s', vars)
 
     def test_group_compression(self):
-        task = GroupCompression(
+        task = CompressDataset(
             file='test/resources/MOTIV-single-event.nc',
             dst='/tmp/iasi',
             force=True
