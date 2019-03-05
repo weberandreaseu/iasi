@@ -1,7 +1,9 @@
+import logging
+
 import numpy as np
 from luigi.util import requires
 from netCDF4 import Dataset, Group, Variable
-import logging
+
 from iasi.file import CopyNetcdfFile, MoveVariables
 from iasi.util import Quadrant
 

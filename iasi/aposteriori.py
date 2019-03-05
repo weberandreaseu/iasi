@@ -8,13 +8,11 @@ from typing import Dict
 import luigi
 import numpy as np
 import pandas as pd
+from luigi.util import requires
 from netCDF4 import Dataset
 
-from iasi.compression import SingularValueDecomposition, EigenDecomposition
 from iasi.file import CopyNetcdfFile, ReadFile
 from iasi.util import CustomTask
-
-from luigi.util import requires
 
 
 class AposterioriProcessing(CustomTask):
@@ -130,7 +128,7 @@ class AposterioriProcessing(CustomTask):
     #     return {'n_files': len(self.files), 'n_events': n_events}
 
 
-@requires(SingularValueDecomposition)
+# @requires(SingularValueDecomposition)
 class SvdAposteriori(AposterioriProcessing):
     def output(self):
         return self.create_local_target('aposteriori', 'svd', str(self.dim), file=self.file, ext='csv')
@@ -156,7 +154,9 @@ class SvdAposteriori(AposterioriProcessing):
                     result[event, row, column] = np.dot(U, np.dot(sigma, Vh))
         return result
 
-@requires(EigenDecomposition)
+# @requires(EigenDecomposition)
+
+
 class EigenAposteriori(AposterioriProcessing):
     def output(self):
         return self.create_local_target('aposteriori', 'eigen', str(self.dim), file=self.file, ext='csv')

@@ -1,12 +1,11 @@
+import logging
 import os
-
-import luigi
-from luigi.util import inherits, requires
-from netCDF4 import Dataset, Variable, Group
-import numpy as np
 from typing import List
 
-import logging
+import luigi
+import numpy as np
+from luigi.util import inherits, requires
+from netCDF4 import Dataset, Group, Variable
 
 
 class CommonParams(luigi.Task):
