@@ -10,8 +10,9 @@ from netCDF4 import Dataset, Group, Variable
 from scipy import linalg
 
 from iasi.decomposition import Decomposition
+from iasi.composition import Composition
 from iasi.file import CopyNetcdfFile, MoveVariables
-from iasi.util import child_groups_of, child_variables_of
+from iasi.util import child_groups_of, child_variables_of, Quadrant
 
 
 @requires(MoveVariables)
@@ -46,6 +47,31 @@ class CompressDataset(CopyNetcdfFile):
                               dim_species, dim_levels)
             except ValueError:
                 self.copy_variable(output, var, group.path)
+        input.close()
+        output.close()
+
+
+@requires(CompressDataset)
+class DecompressDataset(CopyNetcdfFile):
+
+    exclusion_pattern = r"state"
+
+    def output(self):
+        return self.create_local_target('decompression', file=self.file)
+
+    def run(self):
+        input = Dataset(self.input().path)
+        output = Dataset(self.output().path, 'w', format=self.format)
+        self.copy_dimensions(input, output)
+        self.copy_variables(input, output)
+        levels = input['atm_nol'][...]
+        for group in child_groups_of(input['state']):
+            try:
+                comp = Composition(group)
+                comp.export_reconstruction(output, levels)
+            except ValueError:
+                for var in group.variables.values():
+                    self.copy_variable(output, var, group.path)
         input.close()
         output.close()
 

@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from iasi import Composition, CompressDataset, MoveVariables
+from iasi import Composition, CompressDataset, MoveVariables, DecompressDataset
 from iasi.util import child_variables_of
 from netCDF4 import Dataset, Group, Variable
 import luigi
@@ -11,7 +11,7 @@ class TestComposition(unittest.TestCase):
     def setUpClass(cls):
         file = 'test/resources/MOTIV-single-event.nc'
         # make sure there is a compressed file for testing purpose
-        compression = CompressDataset(
+        compression = DecompressDataset(
             file=file,
             dst='/tmp/iasi',
             force=True

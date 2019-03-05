@@ -22,12 +22,16 @@ class Composition:
     def reconstruct(self, nol: np.ma.MaskedArray):
         return self.composition.reconstruct(nol)
 
+    def export_reconstruction(self, output: Dataset, nol: np.ma.MaskedArray):
+        self.composition.export_reconstruction(output, nol)
+
 
 class SingularValueComposition:
 
     def __init__(self, group: Group):
         vars = group.variables.keys()
         assert 'U' in vars and 's' in vars and 'Vh' in vars
+        self.group = group
         self.U = group['U']
         self.s = group['s']
         self.Vh = group['Vh']
@@ -47,12 +51,19 @@ class SingularValueComposition:
             # result[event] = q.disassemble(reconstruction, nol[event])
         return result
 
+    def export_reconstruction(self, output: Dataset, nol: np.ma.MaskedArray):
+        matrix = self.reconstruct(nol)
+        q: Quadrant = Quadrant.for_disassembly(self.Vh)
+        var = output.createVariable(self.group.path, self.Vh.datatype, q.assembles)
+        var[:] = matrix[:]
+
 
 class EigenComposition:
 
     def __init__(self, group: Group):
         vars = group.variables.keys()
         assert 'Q' in vars and 's' in vars
+        self.group = group
         self.Q = group['Q']
         self.s = group['s']
 
@@ -69,3 +80,9 @@ class EigenComposition:
             q.assign_disassembly(reconstruction, result[event], level)
             # result[event] = q.disassemble(reconstruction, nol[event])
         return result
+
+    def export_reconstruction(self, output: Dataset, nol: np.ma.MaskedArray):
+        matrix = self.reconstruct(nol)
+        q: Quadrant = Quadrant.for_disassembly(self.Q)
+        var = output.createVariable(self.group.path, self.Q.datatype, q.assembles)
+        var[:] = matrix[:]
