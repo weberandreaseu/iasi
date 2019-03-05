@@ -9,7 +9,6 @@ from iasi.quadrant import Quadrant
 
 
 class Composition:
-
     @staticmethod
     def factory(group: Group):
         if 'U' in group.variables.keys():
@@ -18,26 +17,30 @@ class Composition:
             return EigenComposition(group)
         raise ValueError('Group {} cannot be composed'.format(group.name))
 
-    def reconstruct(self, nol: np.ma.MaskedArray):
+    def __init__(self, group: Group):
+        self.group = group
+
+    def reconstruct(self, nol: np.ma.MaskedArray, target: Dataset = None):
         raise NotImplementedError
 
-    def export_reconstruction(self, output: Dataset, nol: np.ma.MaskedArray):
-        raise NotImplementedError
+    def export_reconstruction(self, target: Dataset, array: np.ma.MaskedArray, quadrant: Quadrant):
+        var = quadrant.create_variable(target, self.group.path)
+        var[:] = array[:]
 
 
-class SingularValueComposition:
+class SingularValueComposition(Composition):
 
     def __init__(self, group: Group):
+        super().__init__(group)
         vars = group.variables.keys()
         assert 'U' in vars and 's' in vars and 'Vh' in vars
-        self.group = group
         self.U = group['U']
         self.s = group['s']
         self.Vh = group['Vh']
 
-    def reconstruct(self, nol: np.ma.MaskedArray) -> np.ma.MaskedArray:
+    def reconstruct(self, nol: np.ma.MaskedArray, target: Dataset = None) -> np.ma.MaskedArray:
         q: Quadrant = Quadrant.for_disassembly(self.Vh)
-        result = np.ma.masked_all(q.disassembly_shape(), dtype=np.float32)
+        result = np.ma.masked_all(q.transformed_shape(), dtype=np.float32)
         for event in range(self.Vh.shape[0]):
             if np.ma.is_masked(nol[event]):
                 logging.warning('Skipping event %d', event)
@@ -48,28 +51,23 @@ class SingularValueComposition:
             reconstruction = (U * s).dot(Vh)
             q.assign_disassembly(reconstruction, result[event], level)
             # result[event] = q.disassemble(reconstruction, nol[event])
+        if target:
+            self.export_reconstruction(target, result, q)
         return result
 
-    def export_reconstruction(self, output: Dataset, nol: np.ma.MaskedArray):
-        matrix = self.reconstruct(nol)
-        q: Quadrant = Quadrant.for_disassembly(self.Vh)
-        var = output.createVariable(
-            self.group.path, self.Vh.datatype, q.assembles)
-        var[:] = matrix[:]
 
-
-class EigenComposition:
+class EigenComposition(Composition):
 
     def __init__(self, group: Group):
+        super().__init__(group)
         vars = group.variables.keys()
         assert 'Q' in vars and 's' in vars
-        self.group = group
         self.Q = group['Q']
         self.s = group['s']
 
-    def reconstruct(self, nol: np.ma.MaskedArray) -> np.ma.MaskedArray:
+    def reconstruct(self, nol: np.ma.MaskedArray, target: Dataset = None) -> np.ma.MaskedArray:
         q: Quadrant = Quadrant.for_disassembly(self.Q)
-        result = np.ma.masked_all(q.disassembly_shape(), dtype=np.float32)
+        result = np.ma.masked_all(q.transformed_shape(), dtype=np.float32)
         for event in range(self.Q.shape[0]):
             if np.ma.is_masked(nol[event]):
                 logging.warning('Skipping event %d', event)
@@ -79,11 +77,6 @@ class EigenComposition:
             reconstruction = (Q * s).dot(Q.T)
             q.assign_disassembly(reconstruction, result[event], level)
             # result[event] = q.disassemble(reconstruction, nol[event])
+        if target:
+            self.export_reconstruction(target, result, q)
         return result
-
-    def export_reconstruction(self, output: Dataset, nol: np.ma.MaskedArray):
-        matrix = self.reconstruct(nol)
-        q: Quadrant = Quadrant.for_disassembly(self.Q)
-        var = output.createVariable(
-            self.group.path, self.Q.datatype, q.assembles)
-        var[:] = matrix[:]

@@ -5,7 +5,6 @@ from iasi.util import CustomTask
 from iasi import CompressDataset, MoveVariables
 import luigi
 from netCDF4 import Dataset, Variable, Group
-from iasi.quadrant import Quadrant, TwoQuadrants, FourQuadrants
 from iasi.util import child_variables_of, child_groups_of
 import numpy as np
 

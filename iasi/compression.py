@@ -69,7 +69,7 @@ class DecompressDataset(CopyNetcdfFile):
         for group in child_groups_of(input['state']):
             try:
                 comp = Composition.factory(group)
-                comp.export_reconstruction(output, levels)
+                comp.reconstruct(levels, output)
             except ValueError:
                 for var in group.variables.values():
                     self.copy_variable(output, var, group.path)
