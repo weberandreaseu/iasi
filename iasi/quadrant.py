@@ -35,6 +35,9 @@ class Quadrant:
     def assign_disassembly(self, of, to, l):
         to[:l, :l] = of[:l, :l]
 
+    def upper_and_lower_dimension(self):
+        return ('atmospheric_grid_levels', 'atmospheric_grid_levels')
+
 
 class AssembleTwoQuadrants(Quadrant):
 
@@ -51,6 +54,9 @@ class AssembleTwoQuadrants(Quadrant):
     def create_variable(self, output: Dataset, path: str) -> Variable:
         return output.createVariable(path, self.var.datatype,
                                      DisassembleTwoQuadrants.matches)
+
+    def upper_and_lower_dimension(self):
+        return ('double_atmospheric_grid_levels', 'atmospheric_grid_levels')
 
 
 class DisassembleTwoQuadrants(Quadrant):
@@ -88,6 +94,9 @@ class AssembleFourQuadrants(Quadrant):
     def transformed_shape(self):
         grid_levels = self.var.shape[4]
         return (self.var.shape[0], grid_levels * 2, grid_levels * 2)
+
+    def upper_and_lower_dimension(self):
+        return ('double_atmospheric_grid_levels', 'double_atmospheric_grid_levels')
 
 
 class DisassembleFourQuadrants(Quadrant):
