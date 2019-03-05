@@ -8,8 +8,7 @@ from netCDF4 import Dataset
 class IntegrationTest(TestCompareDecompressionResult):
     @classmethod
     def setUpClass(cls):
-        file = 'data/input/METOPA_20160625001453_50240_20190209151722.nc'
-        # make sure there is a compressed file for testing purpose
+        file = '/tmp/data/METOPA_20160625001453_50240_20190209151722.nc'
         compression = DecompressDataset(
             file=file,
             dst='/tmp/iasi',

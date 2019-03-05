@@ -6,19 +6,20 @@ steps:
   image: jupyter/scipy-notebook
   pull: always
   commands:
-  - /bin/bash script/setup.sh
+  - pip install -r requirements.txt
   - python -m unittest discover -v -s ./test
 - name: integration test
   image: jupyter/scipy-notebook
   pull: always
   volumes:
     - name: data
-      path: data
+      path: /tmp/data
   commands:
+  - pip install -r requirements.txt
   - /bin/bash script/setup.sh
   - python -m unittest discover -s ./test -p "integration*.py"
 
 volumes:
 - name: data
   host:
-    path: /home/andreas/projects/motiv/data
+    path: /home/andreas/projects/motiv/data/
