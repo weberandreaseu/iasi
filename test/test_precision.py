@@ -1,9 +1,10 @@
 import unittest
 import numpy as np
 from iasi import Composition, CompressDataset, MoveVariables, DecompressDataset
-from iasi.util import child_variables_of
+from iasi.util import child_variables_of, child_groups_of
 from netCDF4 import Dataset, Group, Variable
 import luigi
+from typing import Set
 
 
 class TestComposition(unittest.TestCase):
@@ -29,6 +30,20 @@ class TestComposition(unittest.TestCase):
     def tearDownClass(cls):
         cls.compressed.close()
         cls.uncompressed.close()
+
+    def variable_names(self, variables) -> Set:
+        return set(map(lambda v: v.name, variables))
+
+    def group_paths(self, groups) -> Set:
+        return set(map(lambda g: g.path, groups))
+
+    def test_variable_equality(self):
+        for group in child_groups_of(self.uncompressed):
+            if group.path == '/':
+                other_vars = set(self.compressed.variables.keys())
+            else:
+                other_vars = set(self.compressed[group.path].variables.keys())
+            self.assertSetEqual(set(group.variables.keys()), other_vars)
 
     def test_reconstruction_of_all_variables(self):
         for group, var in child_variables_of(self.uncompressed['state']):
