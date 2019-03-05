@@ -5,7 +5,7 @@ from luigi.util import requires
 from netCDF4 import Dataset, Group, Variable
 
 from iasi.file import CopyNetcdfFile, MoveVariables
-from iasi.util import Quadrant
+from iasi.quadrant import Quadrant
 
 
 class Composition:

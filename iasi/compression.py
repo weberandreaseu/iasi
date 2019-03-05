@@ -12,7 +12,8 @@ from scipy import linalg
 from iasi.decomposition import Decomposition
 from iasi.composition import Composition
 from iasi.file import CopyNetcdfFile, MoveVariables
-from iasi.util import child_groups_of, child_variables_of, Quadrant
+from iasi.quadrant import Quadrant
+from iasi.util import child_groups_of, child_variables_of
 
 
 @requires(MoveVariables)
