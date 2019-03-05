@@ -6,18 +6,18 @@ from netCDF4 import Dataset, Group, Variable
 
 
 class Decomposition:
-    def __init__(self, variable: Variable, dimension_names):
+
+    @staticmethod
+    def factory(variable: Variable, dimension_names):
         if variable.name.endswith('atm_n'):
-            self.decomposition = EigenDecomposition(variable, dimension_names)
-            return
+            return EigenDecomposition(variable, dimension_names)
         if variable.dimensions[-2:] == ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
-            self.decomposition = SingularValueDecomposition(variable, dimension_names)
-            return
+            return SingularValueDecomposition(variable, dimension_names)
         raise ValueError(f'Variable {variable.name} cannot be decomposed')
 
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
-        self.decomposition.decompose(output, group, var, levels, dim_species, dim_levels)
-
+        raise NotImplementedError
+        
     def select_significant(self, eigenvalues: List, thres=10e-4) -> List:
         most_significant = eigenvalues[0]
         return list(filter(lambda eig: eig > most_significant * thres, eigenvalues))

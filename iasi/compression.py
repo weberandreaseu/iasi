@@ -42,7 +42,7 @@ class CompressDataset(CopyNetcdfFile):
         self.dimension_names[dim_levels] = 'atmospheric_grid_levels'
         for group, var in child_variables_of(input['state']):
             try:
-                dec = Decomposition(var, self.dimension_names)
+                dec = Decomposition.factory(var, self.dimension_names)
                 dec.decompose(output, group, var, levels,
                               dim_species, dim_levels)
             except ValueError:
@@ -67,7 +67,7 @@ class DecompressDataset(CopyNetcdfFile):
         levels = input['atm_nol'][...]
         for group in child_groups_of(input['state']):
             try:
-                comp = Composition(group)
+                comp = Composition.factory(group)
                 comp.export_reconstruction(output, levels)
             except ValueError:
                 for var in group.variables.values():

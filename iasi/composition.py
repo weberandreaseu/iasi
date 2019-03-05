@@ -10,20 +10,19 @@ from iasi.util import Quadrant
 
 class Composition:
 
-    def __init__(self, group: Group):
+    @staticmethod
+    def factory(group: Group):
         if 'U' in group.variables.keys():
-            self.composition = SingularValueComposition(group)
-            return
+            return SingularValueComposition(group)
         if 'Q' in group.variables.keys():
-            self.composition = EigenComposition(group)
-            return
+            return EigenComposition(group)
         raise ValueError('Group {} cannot be composed'.format(group.name))
 
     def reconstruct(self, nol: np.ma.MaskedArray):
-        return self.composition.reconstruct(nol)
+        raise NotImplementedError
 
     def export_reconstruction(self, output: Dataset, nol: np.ma.MaskedArray):
-        self.composition.export_reconstruction(output, nol)
+        raise NotImplementedError
 
 
 class SingularValueComposition:
@@ -54,7 +53,8 @@ class SingularValueComposition:
     def export_reconstruction(self, output: Dataset, nol: np.ma.MaskedArray):
         matrix = self.reconstruct(nol)
         q: Quadrant = Quadrant.for_disassembly(self.Vh)
-        var = output.createVariable(self.group.path, self.Vh.datatype, q.assembles)
+        var = output.createVariable(
+            self.group.path, self.Vh.datatype, q.assembles)
         var[:] = matrix[:]
 
 
@@ -84,5 +84,6 @@ class EigenComposition:
     def export_reconstruction(self, output: Dataset, nol: np.ma.MaskedArray):
         matrix = self.reconstruct(nol)
         q: Quadrant = Quadrant.for_disassembly(self.Q)
-        var = output.createVariable(self.group.path, self.Q.datatype, q.assembles)
+        var = output.createVariable(
+            self.group.path, self.Q.datatype, q.assembles)
         var[:] = matrix[:]
