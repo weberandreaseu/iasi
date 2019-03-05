@@ -5,9 +5,10 @@ from iasi.util import child_variables_of, child_groups_of
 from netCDF4 import Dataset, Group, Variable
 import luigi
 from typing import Set
+import os
 
 
-class TestComposition(unittest.TestCase):
+class TestCompareDecompressionResult(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         file = 'test/resources/MOTIV-single-event.nc'
@@ -37,7 +38,7 @@ class TestComposition(unittest.TestCase):
     def group_paths(self, groups) -> Set:
         return set(map(lambda g: g.path, groups))
 
-    def test_variable_equality(self):
+    def test_all_variables_exist(self):
         for group in child_groups_of(self.uncompressed):
             if group.path == '/':
                 other_vars = set(self.compressed.variables.keys())
@@ -45,8 +46,14 @@ class TestComposition(unittest.TestCase):
                 other_vars = set(self.compressed[group.path].variables.keys())
             self.assertSetEqual(set(group.variables.keys()), other_vars)
 
-    def test_reconstruction_of_all_variables(self):
-        for group, var in child_variables_of(self.uncompressed['state']):
-            pass
-            # for each variable try decomposition and composition
-            # test if results are nearly equal
+    def test_all_variable_values_are_close(self):
+        for group, var in child_variables_of(self.uncompressed):
+            path = os.path.join(group.path, var.name)
+            # path = group.path + var.name
+            original = var[...]
+            reconstructed = self.compressed[path][...]
+            same_mask = np.equal(original.mask, reconstructed.mask).all()
+            self.assertTrue(same_mask, 'reconstruced mask is not equal')
+            # self.assertTrue()
+            close = np.ma.allclose(original, reconstructed, atol=1e-3)
+            self.assertTrue(close, f'reconstruction values are not close for {path}')
