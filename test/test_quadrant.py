@@ -22,7 +22,7 @@ class TestQuadrants(unittest.TestCase):
             file=file,
             dst='/tmp/iasi'
         )
-        luigi.build([compression, uncompressed], local_scheduler=True)
+        assert luigi.build([compression, uncompressed], local_scheduler=True)
         cls.compressed = Dataset(compression.output().path)
         cls.uncompressed = Dataset(uncompressed.output().path)
 

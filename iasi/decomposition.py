@@ -9,11 +9,11 @@ from iasi.quadrant import Quadrant
 class Decomposition:
 
     @staticmethod
-    def factory(variable: Variable, dimension_names):
+    def factory(variable: Variable):
         if variable.name.endswith('atm_n'):
-            return EigenDecomposition(variable, dimension_names)
+            return EigenDecomposition(variable)
         if variable.dimensions[-2:] == ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
-            return SingularValueDecomposition(variable, dimension_names)
+            return SingularValueDecomposition(variable)
         raise ValueError(f'Variable {variable.name} cannot be decomposed')
 
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
@@ -41,8 +41,7 @@ class Decomposition:
 
 
 class SingularValueDecomposition(Decomposition):
-    def __init__(self, variable: Variable, dimension_names):
-        self.dimension_names = dimension_names
+    def __init__(self, variable: Variable):
         self.var = variable
 
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
@@ -87,8 +86,7 @@ class SingularValueDecomposition(Decomposition):
 
 
 class EigenDecomposition(Decomposition):
-    def __init__(self, variable: Variable, dimension_names):
-        self.dimension_names = dimension_names
+    def __init__(self, variable: Variable):
         self.var = variable
 
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:

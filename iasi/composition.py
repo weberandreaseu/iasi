@@ -23,7 +23,7 @@ class Composition:
     def reconstruct(self, nol: np.ma.MaskedArray, target: Dataset = None):
         raise NotImplementedError
 
-    def export_reconstruction(self, target: Dataset, array: np.ma.MaskedArray, quadrant: Quadrant):
+    def _export_reconstruction(self, target: Dataset, array: np.ma.MaskedArray, quadrant: Quadrant):
         var = quadrant.create_variable(target, self.group.path)
         var[:] = array[:]
 
@@ -52,7 +52,7 @@ class SingularValueComposition(Composition):
             q.assign_disassembly(reconstruction, result[event], level)
             # result[event] = q.disassemble(reconstruction, nol[event])
         if target:
-            self.export_reconstruction(target, result, q)
+            self._export_reconstruction(target, result, q)
         return result
 
 
@@ -78,5 +78,5 @@ class EigenComposition(Composition):
             q.assign_disassembly(reconstruction, result[event], level)
             # result[event] = q.disassemble(reconstruction, nol[event])
         if target:
-            self.export_reconstruction(target, result, q)
+            self._export_reconstruction(target, result, q)
         return result
