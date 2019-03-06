@@ -18,7 +18,8 @@ class Decomposition:
             return EigenDecomposition(variable)
         if variable.dimensions[-2:] == ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
             return SingularValueDecomposition(variable)
-        raise DecompositionException(f'Variable {variable.name} cannot be decomposed')
+        raise DecompositionException(
+            f'Variable {variable.name} cannot be decomposed')
 
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
         raise NotImplementedError
@@ -56,10 +57,10 @@ class SingularValueDecomposition(Decomposition):
         all_s = np.ma.masked_all((events, lower_bound))
         all_Vh = np.ma.masked_all((events, lower_bound, upper_bound))
         for event in range(var.shape[0]):
-            level = levels[event]
-            if np.ma.is_masked(level):
+            if np.ma.is_masked(levels[event]):
                 continue
             # reduce array dimensions
+            level = int(levels.data[event])
             matrix = q.transform(var[event][...], level)
             if not self.matrix_ok(event, var, matrix):
                 continue
@@ -100,9 +101,9 @@ class EigenDecomposition(Decomposition):
         all_Q = np.ma.masked_all((events, bound, bound))
         all_s = np.ma.masked_all((events, bound))
         for event in range(var.shape[0]):
-            level = levels[event]
-            if np.ma.is_masked(level):
+            if np.ma.is_masked(levels[event]):
                 continue
+            level = int(levels.data[event])
             # reduce array dimensions
             matrix = q.transform(var[event][...], level)
             # decompose reduced array

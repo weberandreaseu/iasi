@@ -46,7 +46,8 @@ class SingularValueComposition(Composition):
         for event in range(self.Vh.shape[0]):
             if np.ma.is_masked(nol[event]):
                 logging.warning('Skipping event %d', event)
-            level = nol.data[event]
+                continue
+            level = int(nol.data[event])
             U = self.U[event][...]
             s = self.s[event][...]
             Vh = self.Vh[event][...]
@@ -73,7 +74,8 @@ class EigenComposition(Composition):
         for event in range(self.Q.shape[0]):
             if np.ma.is_masked(nol[event]):
                 logging.warning('Skipping event %d', event)
-            level = nol.data[event]
+                continue
+            level = int(nol.data[event])
             Q = self.Q[event][...]
             s = self.s[event][...]
             reconstruction = (Q * s).dot(Q.T)
