@@ -7,8 +7,10 @@ from netCDF4 import Dataset, Group, Variable
 from iasi.file import CopyNetcdfFile, MoveVariables
 from iasi.quadrant import Quadrant
 
+
 class CompositionException(Exception):
     pass
+
 
 class Composition:
     @staticmethod
@@ -17,7 +19,8 @@ class Composition:
             return SingularValueComposition(group)
         if 'Q' in group.variables.keys():
             return EigenComposition(group)
-        raise CompositionException('Group {} cannot be composed'.format(group.name))
+        raise CompositionException(
+            'Group {} cannot be composed'.format(group.name))
 
     def __init__(self, group: Group):
         self.group = group
@@ -44,7 +47,7 @@ class SingularValueComposition(Composition):
         q: Quadrant = Quadrant.for_disassembly(self.Vh)
         result = np.ma.masked_all(q.transformed_shape(), dtype=np.float32)
         for event in range(self.Vh.shape[0]):
-            if np.ma.is_masked(nol[event]):
+            if np.ma.is_masked(nol[event]) or nol.data[event] > 29:
                 logging.warning('Skipping event %d', event)
                 continue
             level = int(nol.data[event])
@@ -72,7 +75,7 @@ class EigenComposition(Composition):
         q: Quadrant = Quadrant.for_disassembly(self.Q)
         result = np.ma.masked_all(q.transformed_shape(), dtype=np.float32)
         for event in range(self.Q.shape[0]):
-            if np.ma.is_masked(nol[event]):
+            if np.ma.is_masked(nol[event]) or nol.data[event] > 29:
                 logging.warning('Skipping event %d', event)
                 continue
             level = int(nol.data[event])

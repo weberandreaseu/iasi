@@ -57,7 +57,7 @@ class SingularValueDecomposition(Decomposition):
         all_s = np.ma.masked_all((events, lower_bound))
         all_Vh = np.ma.masked_all((events, lower_bound, upper_bound))
         for event in range(var.shape[0]):
-            if np.ma.is_masked(levels[event]):
+            if np.ma.is_masked(levels[event]) or levels.data[event] > 29:
                 continue
             # reduce array dimensions
             level = int(levels.data[event])
@@ -101,7 +101,7 @@ class EigenDecomposition(Decomposition):
         all_Q = np.ma.masked_all((events, bound, bound))
         all_s = np.ma.masked_all((events, bound))
         for event in range(var.shape[0]):
-            if np.ma.is_masked(levels[event]):
+            if np.ma.is_masked(levels[event]) or levels.data[event] > 29:
                 continue
             level = int(levels.data[event])
             # reduce array dimensions
