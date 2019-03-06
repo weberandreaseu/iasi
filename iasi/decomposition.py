@@ -6,6 +6,10 @@ from netCDF4 import Dataset, Group, Variable
 from iasi.quadrant import Quadrant
 
 
+class DecompositionException(Exception):
+    pass
+
+
 class Decomposition:
 
     @staticmethod
@@ -14,7 +18,7 @@ class Decomposition:
             return EigenDecomposition(variable)
         if variable.dimensions[-2:] == ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
             return SingularValueDecomposition(variable)
-        raise ValueError(f'Variable {variable.name} cannot be decomposed')
+        raise DecompositionException(f'Variable {variable.name} cannot be decomposed')
 
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
         raise NotImplementedError

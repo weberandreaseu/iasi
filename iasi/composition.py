@@ -7,6 +7,8 @@ from netCDF4 import Dataset, Group, Variable
 from iasi.file import CopyNetcdfFile, MoveVariables
 from iasi.quadrant import Quadrant
 
+class CompositionException(Exception):
+    pass
 
 class Composition:
     @staticmethod
@@ -15,7 +17,7 @@ class Composition:
             return SingularValueComposition(group)
         if 'Q' in group.variables.keys():
             return EigenComposition(group)
-        raise ValueError('Group {} cannot be composed'.format(group.name))
+        raise CompositionException('Group {} cannot be composed'.format(group.name))
 
     def __init__(self, group: Group):
         self.group = group

@@ -9,8 +9,8 @@ from luigi.util import common_params, inherits, requires
 from netCDF4 import Dataset, Group, Variable
 from scipy import linalg
 
-from iasi.decomposition import Decomposition
-from iasi.composition import Composition
+from iasi.decomposition import Decomposition, DecompositionException
+from iasi.composition import Composition, CompositionException
 from iasi.file import CopyNetcdfFile, MoveVariables
 from iasi.quadrant import Quadrant
 from iasi.util import child_groups_of, child_variables_of
@@ -40,7 +40,7 @@ class CompressDataset(CopyNetcdfFile):
                 dec = Decomposition.factory(var)
                 dec.decompose(output, group, var, levels,
                               dim_species, dim_levels)
-            except ValueError:
+            except DecompositionException:
                 self.copy_variable(output, var, group.path)
         input.close()
         output.close()
@@ -64,7 +64,7 @@ class DecompressDataset(CopyNetcdfFile):
             try:
                 comp = Composition.factory(group)
                 comp.reconstruct(levels, output)
-            except ValueError:
+            except CompositionException:
                 for var in group.variables.values():
                     self.copy_variable(output, var, group.path)
         input.close()
