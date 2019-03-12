@@ -87,8 +87,8 @@ class AssembleFourQuadrants(Quadrant):
 
     def transform(self, array: np.ma.MaskedArray, levels: int):
         return np.block([
-            [array[0, 0, :levels, :levels], array[0, 1, :levels, :levels]],
-            [array[1, 0, :levels, :levels], array[1, 1, :levels, :levels]]
+            [array[0, 0, :levels, :levels], array[1, 0, :levels, :levels]],
+            [array[0, 1, :levels, :levels], array[1, 1, :levels, :levels]]
         ])
 
     def transformed_shape(self):
@@ -106,8 +106,8 @@ class DisassembleFourQuadrants(Quadrant):
     def transform(self, a: np.ma.MaskedArray, l: int):
         d = int(self.var.shape[2] / 2)
         return np.array([
-            [a[:l, :l], a[:l, d:d + l]],
-            [a[d:d + l, :l], a[d:d + l, d:d + l]]
+            [a[0:l + 0, 0:l + 0], a[d:d + l, 0:l + 0]],
+            [a[0:l + 0, d:d + l], a[d:d + l, d:d + l]]
         ])
 
     def transformed_shape(self):
@@ -118,8 +118,8 @@ class DisassembleFourQuadrants(Quadrant):
         return output.createVariable(path, self.var.datatype,
                                      AssembleFourQuadrants.matches)
 
-    def assign_disassembly(self, of, to, l):
-        to[0, 0, :l, :l] = of[:l, :l]
-        to[0, 1, :l, :l] = of[:l, l:2*l]
-        to[1, 0, :l, :l] = of[l:2*l, :l]
-        to[1, 1, :l, :l] = of[l:2*l, l:2*l]
+    def assign_disassembly(self, reconstructed, result, l):
+        result[0, 0, :l, :l] = reconstructed[:l, :l]
+        result[1, 0, :l, :l] = reconstructed[:l, l:2*l]
+        result[0, 1, :l, :l] = reconstructed[l:2*l, :l]
+        result[1, 1, :l, :l] = reconstructed[l:2*l, l:2*l]

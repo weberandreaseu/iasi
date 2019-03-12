@@ -99,7 +99,6 @@ class TestComposition(unittest.TestCase):
         ), 'Reconstructed array contains nans')
         self.assertFalse(np.isinf(reconstruction[:, :28, :28]).any(
         ), 'Reconstructed array contains inf')
-        close = np.allclose(reconstruction.compressed(), original.compressed(), atol=1.e-4)
-        diff = reconstruction.compressed() - original.compressed()
+        close = np.allclose(reconstruction.compressed(), original.compressed(), atol=2.e-4)
         self.assertTrue(close, 'Reconstructed data for SVD is not close')
         self.assertTrue(self.masks_equal(reconstruction, original))
