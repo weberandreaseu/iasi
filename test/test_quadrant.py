@@ -70,6 +70,8 @@ class TestQuadrants(unittest.TestCase):
         array = np.random.uniform(size=(2, 2, 29, 29))
         assembly = q.transform(array, 23)
         self.assertTupleEqual(assembly.shape, (46, 46))
+        close = np.allclose(assembly[23:23*2, :23], array[0, 1, :23, :23])
+        self.assertTrue(close, 'Four quadrant assembly not close')
 
     def test_single_quadrant_disassembly(self):
         atm_n = self.compressed['state/HNO3/atm_n/Q']
@@ -92,12 +94,23 @@ class TestQuadrants(unittest.TestCase):
         self.assertTrue(close)
 
     def test_four_quadrant_disassembly(self):
-        avk = self.compressed['state/WV/atm_avk/U']
-        q: Quadrant = Quadrant.for_disassembly(avk)
+        avk_rc = self.compressed['state/WV/atm_avk/U']
+        q: Quadrant = Quadrant.for_disassembly(avk_rc)
+
         self.assertIsInstance(q, DisassembleFourQuadrants)
         self.assertTupleEqual(q.transformed_shape(), (1, 2, 2, 29, 29))
+        avk = self.uncompressed['state/WV/atm_avk/']
+        q_assembly = Quadrant.for_assembly(avk)
         array = np.arange(58*58).reshape(58, 58)
         disassembly = q.transform(array, 23)
+        array_rc = q_assembly.transform(disassembly, 23)
         self.assertTupleEqual(disassembly.shape, (2, 2, 23, 23))
         close = np.allclose(array[29:52, 29:52], disassembly[1, 1, :23, :23])
         self.assertTrue(close)
+        for i in range(2):
+            for j in range(2):
+                close = np.allclose(
+                    array[i * 29:23 + i * 29, j * 29:23 + j * 29],
+                    array_rc[i * 23:(i+1) * 23, j * 23:(j+1) * 23]
+                )
+                self.assertTrue(close)
