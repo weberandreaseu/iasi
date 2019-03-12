@@ -69,7 +69,8 @@ class TestComposition(unittest.TestCase):
         ), 'Reconstructed array contains nans')
         self.assertFalse(np.isinf(reconstruction[:, :28, :28]).any(
         ), 'Reconstructed array contains inf')
-        np.allclose(reconstruction.data, original.data)
+        close = np.allclose(reconstruction.compressed(), original.compressed(), atol=1.e-4)
+        self.assertTrue(close, 'Eigen composition is not close to original')
         self.assertTrue(self.masks_equal(reconstruction, original))
 
     def test_svd_one_quadrant(self):
@@ -84,19 +85,21 @@ class TestComposition(unittest.TestCase):
         self.verify_singular_value_composition(
             'state/WV/atm_avk', (1, 2, 2, 29, 29))
 
-    def verify_singular_value_composition(self, arrtribute: str, shape: Tuple):
-        avk = self.compressed[arrtribute]
+    def verify_singular_value_composition(self, attribute: str, shape: Tuple):
+        avk = self.compressed[attribute]
         self.assertIsInstance(avk, Group)
         svc = SingularValueComposition(avk)
         nol = self.compressed['atm_nol'][...]
         reconstruction = svc.reconstruct(nol)
         self.assertTupleEqual(reconstruction.shape, shape)
-        original = self.uncompressed['state/WV/atm_avk'][...]
+        original = self.uncompressed[attribute][...]
         # reconstruction should contain unmasked vales
         self.assertFalse(reconstruction.mask.all())
         self.assertFalse(np.isnan(reconstruction[:, :28, :28]).any(
         ), 'Reconstructed array contains nans')
         self.assertFalse(np.isinf(reconstruction[:, :28, :28]).any(
         ), 'Reconstructed array contains inf')
-        np.allclose(reconstruction.data, original.data)
+        close = np.allclose(reconstruction.compressed(), original.compressed(), atol=1.e-4)
+        diff = reconstruction.compressed() - original.compressed()
+        self.assertTrue(close, 'Reconstructed data for SVD is not close')
         self.assertTrue(self.masks_equal(reconstruction, original))
