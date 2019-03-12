@@ -24,7 +24,7 @@ class Decomposition:
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
         raise NotImplementedError
 
-    def select_significant(self, eigenvalues: List, thres=10e-4) -> List:
+    def select_significant(self, eigenvalues: List, thres=1e-3) -> List:
         most_significant = eigenvalues[0]
         return list(filter(lambda eig: eig > most_significant * thres, eigenvalues))
 
