@@ -16,11 +16,14 @@ from iasi.quadrant import Quadrant
 from iasi.util import child_groups_of, child_variables_of
 
 
+class CompressionParams(luigi.Config):
+    thres_eigenvalues = luigi.FloatParameter(default=1e-3)
+
+
 @requires(MoveVariables)
-class CompressDataset(CopyNetcdfFile):
+class CompressDataset(CompressionParams, CopyNetcdfFile):
 
     exclusion_pattern = r"state"
-    thres_eigenvalues = luigi.FloatParameter(default=1e-3)
 
     def output(self):
         return self.create_local_target('compression', str(self.thres_eigenvalues), file=self.file)
@@ -99,4 +102,3 @@ class SelectSingleVariable(CopyNetcdfFile):
             assert isinstance(attribute, Variable)
             path, _ = os.path.split(self.variable)
             self.copy_variable(output, attribute, path)
-
