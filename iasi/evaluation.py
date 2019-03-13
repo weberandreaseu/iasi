@@ -1,8 +1,10 @@
-import luigi
-import pandas as pd
 import os
 
-from iasi.compression import CompressDataset
+import luigi
+import pandas as pd
+from sklearn.model_selection import ParameterGrid
+
+from iasi.compression import CompressDataset, SelectSingleVariable
 from iasi.file import MoveVariables
 from iasi.util import CustomTask
 
@@ -13,28 +15,34 @@ class EvaluateCompression(CustomTask):
     variable = luigi.Parameter()
 
     def requires(self):
-        # compression levels
-        return {
-            'original': MoveVariables(file=self.file, dst=self.dst, force=self.force),
-            'reconstructed': [CompressDataset(
-                file=self.file,
-                dst=self.dst,
-                thres_eigenvalues=thres,
-                force=self.force
-            ) for thres in [1e-2, 1e-3, 1e-4, 1e-5]]
+        compression_parameter = {
+            'compressed': [True],
+            'file': [self.file],
+            'dst': [self.dst],
+            'force': [self.force],
+            'threshold': [1e-2, 1e-3, 1e-4, 1e-5],
+            'variable': [self.variable]
         }
+        parameter_grid = list(ParameterGrid(compression_parameter))
+        # add parameter for 
+        parameter_grid.append({
+            'compressed': False,
+            'file': self.file,
+            'dst': self.dst,
+            'force': self.force,
+            'variable': self.variable
+        })
+        return [SelectSingleVariable(**params) for params in parameter_grid]
 
     def run(self):
         df = pd.DataFrame()
-        df = df.append({
-            'compressed': False,
-            'size': self.size_in_kb(self.input()['original'].path)
-        }, ignore_index=True)
-        for task, input in zip(self.requires()['reconstructed'], self.input()['reconstructed']):
+        for task, input in zip(self.requires(), self.input()):
             df = df.append({
-                'compressed': True,
+                'variable': task.variable,
+                'compressed': task.compressed,      
                 'size': self.size_in_kb(input.path),
-                'thres_eigenvalues': task.thres_eigenvalues
+                'threshold': task.threshold
+                # 'file': task.file,
             }, ignore_index=True)
         print('\n', df)
         df.to_csv(self.output().path)

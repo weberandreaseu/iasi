@@ -17,7 +17,7 @@ from iasi.util import child_groups_of, child_variables_of
 
 
 class CompressionParams(luigi.Config):
-    thres_eigenvalues = luigi.FloatParameter(default=1e-3)
+    threshold = luigi.FloatParameter(default=1e-3)
 
 
 @requires(MoveVariables)
@@ -26,7 +26,7 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
     exclusion_pattern = r"state"
 
     def output(self):
-        return self.create_local_target('compression', str(self.thres_eigenvalues), file=self.file)
+        return self.create_local_target('compression', str(self.threshold), file=self.file)
 
     def run(self):
         input = Dataset(self.input().path)
@@ -41,7 +41,7 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
             'double_atmospheric_grid_levels', dim_levels * dim_species)
         for group, var in child_variables_of(input['state']):
             try:
-                dec = Decomposition.factory(var, self.thres_eigenvalues)
+                dec = Decomposition.factory(var, self.threshold)
                 dec.decompose(output, group, var, levels,
                               dim_species, dim_levels)
             except DecompositionException:
@@ -75,7 +75,7 @@ class DecompressDataset(CopyNetcdfFile):
         output.close()
 
 
-class SelectSingleVariable(CopyNetcdfFile):
+class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
     variable = luigi.Parameter()
     compressed = luigi.BoolParameter()
 
@@ -86,8 +86,10 @@ class SelectSingleVariable(CopyNetcdfFile):
             return MoveVariables(dst=self.dst, file=self.file)
 
     def output(self):
-        type = 'compressed' if self.compressed else 'uncompressed'
-        return self.create_local_target('single', type, self.variable, file=self.file)
+        if self.compressed:
+            return self.create_local_target('single', 'compressed', self.variable, str(self.threshold), file=self.file)
+        else:
+            return self.create_local_target('single', 'uncompressed', self.variable, file=self.file)
 
     def run(self):
         input = Dataset(self.input().path, 'r')
