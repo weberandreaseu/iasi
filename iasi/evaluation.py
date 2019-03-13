@@ -10,11 +10,12 @@ from iasi.util import CustomTask
 class EvaluateCompression(CustomTask):
 
     file = luigi.Parameter()
+    variable = luigi.Parameter()
 
     def requires(self):
         # compression levels
         return {
-            'original': MoveVariables(file=self.file, dst=self.dst),
+            'original': MoveVariables(file=self.file, dst=self.dst, force=self.force),
             'reconstructed': [CompressDataset(
                 file=self.file,
                 dst=self.dst,

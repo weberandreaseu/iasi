@@ -9,6 +9,7 @@ class TestEvaluation(unittest.TestCase):
         task = EvaluateCompression(
             file='test/resources/MOTIV-single-event.nc',
             dst='/tmp/iasi',
-            force=True
+            force=True,
+            variable='/state/WV/atm_avk'
         )
         assert luigi.build([task], local_scheduler=True)

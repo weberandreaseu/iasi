@@ -4,6 +4,8 @@ import luigi
 from netCDF4 import Dataset
 
 from iasi import CopyNetcdfFile, MoveVariables
+from iasi.compression import SelectSingleVariable
+from iasi.util import child_variables_of
 
 
 class TestCopyNetcdf(unittest.TestCase):
@@ -80,3 +82,28 @@ class TestCopyNetcdf(unittest.TestCase):
                 group_variables = set(state[compound].variables.keys())
                 expected = {'atm', 'atm_a', 'atm_avk', 'atm_n'}
                 self.assertTrue(expected.issubset(group_variables))
+
+    def test_select_single_variable(self):
+        tasks = [SelectSingleVariable(
+            file='test/resources/MOTIV-single-event.nc',
+            dst='/tmp/iasi/single',
+            force=True,
+            variable='state/WV/atm_avk',
+            compressed=bool
+        ) for bool in [False, True]]
+        assert luigi.build(tasks, local_scheduler=True)
+        # output from move variables (uncompressed)
+        with Dataset(tasks[0].output().path, 'r') as nc:
+            child_items = list(child_variables_of(nc))
+            self.assertEqual(len(child_items), 1)
+            group, var = child_items[0]
+            self.assertEqual(group.path, '/state/WV')
+            self.assertEqual(var.name, 'atm_avk')
+        # output from compress dataset
+        with Dataset(tasks[1].output().path, 'r') as nc:
+            child_items = list(child_variables_of(nc))
+            self.assertEqual(len(child_items), 3)
+            vars = [var.name for _, var in child_items]
+            self.assertListEqual(vars, ['U', 's', 'Vh'])
+            groups = [group.path for group, _ in child_items]
+            self.assertListEqual(groups, ['/state/WV/atm_avk'] * 3)

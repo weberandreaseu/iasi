@@ -4,7 +4,8 @@ import re
 import luigi
 from luigi import Config
 from luigi.util import common_params, inherits, requires
-from netCDF4 import Dataset, Variable
+# from iasi.compression import CompressDataset
+from netCDF4 import Dataset, Variable, Group
 
 from iasi.util import CustomTask
 
@@ -46,9 +47,11 @@ class CopyNetcdfFile(CustomTask):
 
     def copy_variable(self,  target: Dataset, var: Variable, path: str = None) -> Variable:
         if path:
-            out_var = target.createVariable(f'{path}/{var.name}', var.datatype, var.dimensions)
+            out_var = target.createVariable(
+                f'{path}/{var.name}', var.datatype, var.dimensions)
         else:
-            out_var = target.createVariable(var.name, var.datatype, var.dimensions)
+            out_var = target.createVariable(
+                var.name, var.datatype, var.dimensions)
         out_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
         out_var[:] = var[:]
 
