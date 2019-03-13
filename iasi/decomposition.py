@@ -12,11 +12,11 @@ class DecompositionException(Exception):
 
 class Decomposition:
 
-    thres_eigenvalues = 1e-3
+    threshold = 1e-3
 
     @classmethod
-    def factory(cls, variable: Variable, thres_eigenvalues: float = 1e-3):
-        cls.thres_eigenvalues = thres_eigenvalues
+    def factory(cls, variable: Variable, threshold: float = 1e-3):
+        cls.threshold = threshold
         if variable.name.endswith('atm_n'):
             return EigenDecomposition(variable)
         if variable.dimensions[-2:] == ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
@@ -30,7 +30,7 @@ class Decomposition:
 
     def select_significant(self, eigenvalues: List) -> List:
         most_significant = eigenvalues[0]
-        return list(filter(lambda eig: eig > most_significant * self.thres_eigenvalues, eigenvalues))
+        return list(filter(lambda eig: eig > most_significant * self.threshold, eigenvalues))
 
     def matrix_ok(self, event, var, matrix):
         ok = True

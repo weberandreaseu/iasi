@@ -45,13 +45,13 @@ class CopyNetcdfFile(CustomTask):
             output.createDimension(
                 name, len(dim) if not dim.isunlimited() else None)
 
-    def copy_variable(self,  target: Dataset, var: Variable, path: str = None) -> Variable:
+    def copy_variable(self,  target: Dataset, var: Variable, path: str = None, compressed: bool = False) -> Variable:
         if path:
             out_var = target.createVariable(
-                f'{path}/{var.name}', var.datatype, var.dimensions)
+                f'{path}/{var.name}', var.datatype, var.dimensions, zlib=compressed)
         else:
             out_var = target.createVariable(
-                var.name, var.datatype, var.dimensions)
+                var.name, var.datatype, var.dimensions, zlib=compressed)
         out_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
         out_var[:] = var[:]
 

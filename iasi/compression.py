@@ -81,7 +81,12 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
 
     def requires(self):
         if self.compressed:
-            return CompressDataset(dst=self.dst, file=self.file)
+            return CompressDataset(
+                dst=self.dst,
+                file=self.file,
+                threshold=self.threshold
+                # force=self.force
+            )
         else:
             return MoveVariables(dst=self.dst, file=self.file)
 
@@ -99,8 +104,10 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
         attribute = input[self.variable]
         if isinstance(attribute, Group):
             for var in attribute.variables.values():
-                self.copy_variable(output, var, attribute.path)
+                self.copy_variable(output, var, attribute.path,
+                                   compressed=self.compressed)
         else:
             assert isinstance(attribute, Variable)
             path, _ = os.path.split(self.variable)
-            self.copy_variable(output, attribute, path)
+            self.copy_variable(output, attribute, path,
+                               compressed=self.compressed)
