@@ -20,9 +20,10 @@ from iasi.util import child_groups_of, child_variables_of
 class CompressDataset(CopyNetcdfFile):
 
     exclusion_pattern = r"state"
+    thres_eigenvalues = luigi.FloatParameter(default=1e-3)
 
     def output(self):
-        return self.create_local_target('compression', file=self.file)
+        return self.create_local_target('compression', str(self.thres_eigenvalues), file=self.file)
 
     def run(self):
         input = Dataset(self.input().path)
@@ -37,7 +38,7 @@ class CompressDataset(CopyNetcdfFile):
             'double_atmospheric_grid_levels', dim_levels * dim_species)
         for group, var in child_variables_of(input['state']):
             try:
-                dec = Decomposition.factory(var)
+                dec = Decomposition.factory(var, self.thres_eigenvalues)
                 dec.decompose(output, group, var, levels,
                               dim_species, dim_levels)
             except DecompositionException:

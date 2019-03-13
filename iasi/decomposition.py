@@ -12,8 +12,11 @@ class DecompositionException(Exception):
 
 class Decomposition:
 
-    @staticmethod
-    def factory(variable: Variable):
+    thres_eigenvalues = 1e-3
+
+    @classmethod
+    def factory(cls, variable: Variable, thres_eigenvalues: float = 1e-3):
+        cls.thres_eigenvalues = thres_eigenvalues
         if variable.name.endswith('atm_n'):
             return EigenDecomposition(variable)
         if variable.dimensions[-2:] == ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
@@ -21,12 +24,13 @@ class Decomposition:
         raise DecompositionException(
             f'Variable {variable.name} cannot be decomposed')
 
+    # TODO refactor: make methods signature more compact
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
         raise NotImplementedError
 
-    def select_significant(self, eigenvalues: List, thres=1e-3) -> List:
+    def select_significant(self, eigenvalues: List) -> List:
         most_significant = eigenvalues[0]
-        return list(filter(lambda eig: eig > most_significant * thres, eigenvalues))
+        return list(filter(lambda eig: eig > most_significant * self.thres_eigenvalues, eigenvalues))
 
     def matrix_ok(self, event, var, matrix):
         ok = True
