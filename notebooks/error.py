@@ -26,12 +26,13 @@ level = nol.data[event]
 alt = alt.data[event]
 
 cov = Covariance(level, alt)
-s_err = cov.error(avk, np.eye(2*level))
-s_diff = cov.error(avk, avk_rc)
+s_err = cov.smoothing_error_covariance(avk, np.eye(2*level))
+s_diff = cov.smoothing_error_covariance(avk, avk_rc)
 
-plt.imshow(avk)
+plt.imshow(cov.apriori_covariance())
+# plt.imshow((avk - np.identity(2 * level)).T)
 plt.colorbar()
-plt.title('Avk')
+plt.title('S atm')
 plt.show()
 
 plt.imshow(s_err)

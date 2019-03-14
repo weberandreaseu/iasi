@@ -16,21 +16,45 @@ class Covariance:
         return np.exp(-((x - mu)*(x - mu))/(2 * sig * sig))
 
     def traf(self):
+        """P (see equation 6)
+
+        Used to transform {ln[H2O], ln[HDO]} state
+        into the new coordination systems
+        {(ln[H2O]+ln[HDO])/2 and ln[HDO]-ln[H2O]} 
+        """
         return np.block([[np.identity(self.nol)*0.5, np.identity(self.nol)*0.5],
                          [-np.identity(self.nol), np.identity(self.nol)]])
 
-    def s_atm_traf(self):
+    def apriori_covariance_traf(self):
+        """Sa' (see equation 7)
+        
+        A priori covariance of {(ln[H2O]+ln[HDO])/2 and ln[HDO]-ln[H2O]} state
+        Sa See equation 5 in paper
+        """
         result = np.zeros((2 * self.nol, 2 * self.nol))
         for i in range(self.nol):
             for j in range(self.nol):
+                # 2500 = correlation length
+                # 100% for H20
+                # (ln[H2O]+ln[HDO])/2 state
                 result[i, j] = self.gaussian(self.alt[i], self.alt[j], 2500)
+                # 10% for HDO (0.01 at log scale)
+                # ln[HDO]-ln[H2O] state
                 result[i + self.nol, j + self.nol] = 0.01 * \
                     self.gaussian(self.alt[i], self.alt[j], 2500)
         return result
 
-    def s_atm(self):
-        traf = self.traf()
-        return np.linalg.inv(traf) @ self.s_atm_traf() @ np.linalg.inv(traf.T)
+    def apriori_covariance(self):
+        """Sa (see equation 5)
 
-    def error(self, original, compare):
-        return (original - compare) @ self.s_atm() @ (original - compare).T
+        A priori Covariance of {ln[H2O], ln[HDO]} state
+
+        Sa' = P * Sa * P.T (equation 7 in paper)
+        equals to 
+        Sa = inv(P) * Sa' * inv(P.T)
+        """
+        P = self.traf()
+        return np.linalg.inv(P) @ self.apriori_covariance_traf() @ np.linalg.inv(P.T)
+
+    def smoothing_error_covariance(self, original, compare):
+        return (original - compare) @ self.apriori_covariance() @ (original - compare).T
