@@ -16,11 +16,8 @@ class Covariance:
         return np.exp(-((x - mu)*(x - mu))/(2 * sig * sig))
 
     def traf(self):
-        return np.block([
-            [np.diag(np.full(self.nol, +0.5)),
-             np.diag(np.full(self.nol, 0.5))],
-            [np.diag(np.full(self.nol, -1.0)), np.diag(np.full(self.nol, 1.0))]
-        ])
+        return np.block([[np.identity(self.nol)*0.5, np.identity(self.nol)*0.5],
+                         [-np.identity(self.nol), np.identity(self.nol)]])
 
     def s_atm_traf(self):
         result = np.zeros((2 * self.nol, 2 * self.nol))
