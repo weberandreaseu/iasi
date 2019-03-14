@@ -27,7 +27,7 @@ class Covariance:
 
     def apriori_covariance_traf(self):
         """Sa' (see equation 7)
-        
+
         A priori covariance of {(ln[H2O]+ln[HDO])/2 and ln[HDO]-ln[H2O]} state
         Sa See equation 5 in paper
         """
@@ -56,5 +56,25 @@ class Covariance:
         P = self.traf()
         return np.linalg.inv(P) @ self.apriori_covariance_traf() @ np.linalg.inv(P.T)
 
-    def smoothing_error_covariance(self, original, compare):
-        return (original - compare) @ self.apriori_covariance() @ (original - compare).T
+    def avk_traf(self, avk):
+        """A' (see equation 10)
+
+        Return tranformed avk
+        """
+        P = self.traf()
+        return P @ avk @ np.linalg.inv(P)
+
+    def posteriori_traf(self, avk):
+        """A'' (see equation 15)
+
+        A posteriori transformed avk 
+        """
+        A_ = self.avk_traf(avk)
+        C = np.block([[A_[self.nol:, self.nol:], np.zeros((self.nol, self.nol))],
+                      [-A_[self.nol:, :self.nol], np.identity(self.nol)]])
+        return C @ A_
+
+    def smoothing_error_covariance(self, measured, expected):
+        """S's (see equation 11)
+        """
+        return (measured - expected) @ self.apriori_covariance() @ (measured - expected).T
