@@ -20,7 +20,7 @@ class Quadrant:
         dimensions = variable.dimensions
         return next(filter(lambda q: q.matches == dimensions, [cls, DisassembleTwoQuadrants, DisassembleFourQuadrants]))(variable)
 
-    def __init__(self, variable: Variable):
+    def __init__(self, variable: Variable = None):
         self.var = variable
 
     def transform(self, array: np.ma.MaskedArray, levels: int):
