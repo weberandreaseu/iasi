@@ -113,6 +113,7 @@ class EigenDecomposition(Decomposition):
             # decompose reduced array
             if not self.matrix_ok(event, var, matrix):
                 continue
+            # TODO: use np.linalg.eigh for square matrices (probably more performant)
             eigenvalues, eigenvectors = np.linalg.eig(matrix)
             most_significant = self.select_significant(eigenvalues)
             k = len(most_significant)
