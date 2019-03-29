@@ -101,7 +101,7 @@ class WaterVapourError:
         self.nol = nol
         self.alt = alt
 
-    def smoothing_error_all_measurements(self, avk, avk_rc=None, level_of_interest=5):
+    def smoothing_error_all_measurements(self, avk, avk_rc=None, level_of_interest=-19):
         err_max = -np.inf
         err_min = np.inf
         err_mean = 0
@@ -110,6 +110,9 @@ class WaterVapourError:
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
             l = self.nol.data[event]
+            current_level = l + level_of_interest
+            if current_level < 2:
+                continue
             # if reconstructed kernel not given create identity matrix and calculate covariance error
             # else use reconstructed kernel to calculate covariance difference
             expected = np.identity(2*l) if avk_rc is None else \
@@ -117,14 +120,14 @@ class WaterVapourError:
             avk_event = AssembleFourQuadrants().transform(avk[event], l)
             cov = Covariance(l, self.alt[event])
             s_err = cov.smoothing_error_covariance(avk_event, expected)
-            err_max = max(err_max, s_err[level_of_interest, level_of_interest])
-            err_min = min(err_min, s_err[level_of_interest, level_of_interest])
-            err_mean += s_err[level_of_interest, level_of_interest]
+            err_max = max(err_max, s_err[current_level, current_level])
+            err_min = min(err_min, s_err[current_level, current_level])
+            err_mean += s_err[current_level, current_level]
             n += 1
         return (err_min, err_mean / n, err_max)
 
     # TODO refactor
-    def smoothing_error_aposteriori(self, avk, avk_rc=None, level_of_interest=5):
+    def smoothing_error_aposteriori(self, avk, avk_rc=None, level_of_interest=-19):
         err_max = -np.inf
         err_min = np.inf
         err_mean = 0
@@ -133,6 +136,9 @@ class WaterVapourError:
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
             l = self.nol.data[event]
+            current_level = l + level_of_interest
+            if current_level < 2:
+                continue
             # if reconstructed kernel not given create identity matrix and calculate covariance error
             # else use reconstructed kernel to calculate covariance difference
             cov = Covariance(l, self.alt[event])
@@ -145,8 +151,8 @@ class WaterVapourError:
             avk_event = AssembleFourQuadrants().transform(avk[event], l)
             A__ = cov.posteriori_traf(avk_event)
             s_err = cov.smoothing_error_covariance(A__, Arc__)
-            err_max = max(err_max, s_err[level_of_interest, level_of_interest])
-            err_min = min(err_min, s_err[level_of_interest, level_of_interest])
-            err_mean += s_err[level_of_interest, level_of_interest]
+            err_max = max(err_max, s_err[current_level, current_level])
+            err_min = min(err_min, s_err[current_level, current_level])
+            err_mean += s_err[current_level, current_level]
             n += 1
         return (err_min, err_mean / n, err_max)

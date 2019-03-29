@@ -35,10 +35,10 @@ class Covariance:
         for i in range(self.nol):
             for j in range(self.nol):
                 # 2500 = correlation length
-                # 100% for H20
+                # 100% for
                 # (ln[H2O]+ln[HDO])/2 state
                 result[i, j] = self.gaussian(self.alt[i], self.alt[j], 2500)
-                # 10% for HDO (0.01 at log scale)
+                # 10% for (0.01 covariance)
                 # ln[HDO]-ln[H2O] state
                 result[i + self.nol, j + self.nol] = 0.01 * \
                     self.gaussian(self.alt[i], self.alt[j], 2500)
