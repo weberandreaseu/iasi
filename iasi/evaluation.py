@@ -115,11 +115,15 @@ class WaterVapourError:
                 continue
             # if reconstructed kernel not given create identity matrix and calculate covariance error
             # else use reconstructed kernel to calculate covariance difference
-            expected = np.identity(2*l) if avk_rc is None else \
-                AssembleFourQuadrants().transform(avk_rc[event], l)
-            avk_event = AssembleFourQuadrants().transform(avk[event], l)
             cov = Covariance(l, self.alt[event])
-            s_err = cov.smoothing_error_covariance(avk_event, expected)
+            if avk_rc is None:
+                expected = np.identity(2*l)
+            else : 
+                expected = AssembleFourQuadrants().transform(avk_rc[event], l)
+                expected = cov.avk_traf(expected)
+            avk_event = AssembleFourQuadrants().transform(avk[event], l)
+            a_ = cov.avk_traf(avk_event)
+            s_err = cov.smoothing_error_covariance(a_, expected)
             err_max = max(err_max, s_err[current_level, current_level])
             err_min = min(err_min, s_err[current_level, current_level])
             err_mean += s_err[current_level, current_level]
@@ -145,7 +149,8 @@ class WaterVapourError:
             if avk_rc is None:
                 Arc__ = np.identity(2*l)
             else:
-                avk_rc_event = AssembleFourQuadrants().transform(avk_rc[event], l)
+                avk_rc_event = AssembleFourQuadrants(
+                ).transform(avk_rc[event], l)
                 # A''rc
                 Arc__ = cov.posteriori_traf(avk_rc_event)
             avk_event = AssembleFourQuadrants().transform(avk[event], l)
