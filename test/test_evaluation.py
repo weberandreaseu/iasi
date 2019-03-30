@@ -1,12 +1,12 @@
 import luigi
 import unittest
 
-from iasi.evaluation import EvaluateCompression
+from iasi.evaluation import EvaluateCompressionSize
 
 
 class TestEvaluation(unittest.TestCase):
     def test_evaluate_compression(self):
-        task = EvaluateCompression(
+        task = EvaluateCompressionSize(
             file='test/resources/MOTIV-single-event.nc',
             # file='data/input/MOTIV-slice-1000.nc',
             dst='/tmp/iasi',

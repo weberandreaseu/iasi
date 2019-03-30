@@ -14,7 +14,7 @@ from iasi.metrics import Covariance
 from iasi.quadrant import AssembleFourQuadrants
 
 
-class EvaluateCompression(CustomTask):
+class EvaluateCompressionSize(CustomTask):
 
     file = luigi.Parameter()
     variable = luigi.Parameter()
@@ -29,70 +29,79 @@ class EvaluateCompression(CustomTask):
             'variable': [self.variable]
         }
         parameter_grid = list(ParameterGrid(compression_parameter))
+        tasks = [SelectSingleVariable(**params) for params in parameter_grid]
         # only one task for uncompressed reference dataset without compression parameters
-        parameter_grid.append({
-            'compressed': False,
-            'file': self.file,
-            'dst': self.dst,
-            'force': self.force,
-            'threshold': np.nan,
-            'variable': self.variable
-        })
-        return{
-            'single_variable': [SelectSingleVariable(**params) for params in parameter_grid],
-            'original': MoveVariables(dst=self.dst, file=self.file)
-        }
-
-    def run(self):
-        df = pd.DataFrame()
-        original = Dataset(self.input()['original'].path)
-        nol = original['atm_nol'][...]
-        alt = original['atm_altitude'][...]
-        avk = original['state/WV/atm_avk'][...]
-        original.close()
-        wv_error = WaterVapourError(nol, alt)
-        error = wv_error.smoothing_error_all_measurements(avk)
-        a_error = wv_error.smoothing_error_aposteriori(avk)
-        for task, input in zip(self.requires()['single_variable'], self.input()['single_variable']):
-            nc = Dataset(input.path)
-            if isinstance(nc['state/WV/atm_avk'], Variable):
-                # avk is not decomposed
-                avk_rc = nc['state/WV/atm_avk']
-            else:
-                avk_rc = Composition.factory(
-                    nc['state/WV/atm_avk']).reconstruct(nol)
-            diff = wv_error.smoothing_error_all_measurements(
-                avk, avk_rc=avk_rc)
-            a_diff = wv_error.smoothing_error_aposteriori(
-                avk, avk_rc=avk_rc)
-            df = df.append({
-                'variable': task.variable,
-                'compressed': task.compressed,
-                'size': self.size_in_kb(input.path),
-                'threshold': task.threshold,
-                'err_min': error[0],
-                'err_mean': error[1],
-                'err_max': error[2],
-                'err_apost_min': a_error[0],
-                'err_apost_mean': a_error[1],
-                'err_apost_max': a_error[2],
-                'diff_min': diff[0],
-                'diff_mean': diff[1],
-                'diff_max': diff[2],
-                'diff_apost_min': a_diff[0],
-                'diff_apost_mean': a_diff[1],
-                'diff_apost_max': a_diff[2]
-                # 'file': task.file,
-            }, ignore_index=True)
-            nc.close()
-        print('\n', df)
-        df.to_csv(self.output().path, index=False)
-
-    def size_in_kb(self, file):
-        return int(os.path.getsize(file) / 1000)
+        tasks.append(SelectSingleVariable(
+            compressed=False,
+            file=self.file,
+            dst=self.dst,
+            force=self.force,
+            threshold=np.nan,
+            variable=self.variable)
+        )
+        return tasks
 
     def output(self):
         return self.create_local_target('compression-summary', file=self.file, ext='csv')
+
+    def size_in_mb(self, file):
+        return int(os.path.getsize(file) / (1000))
+
+    def run(self):
+        # get size for all parameters
+        df = pd.DataFrame()
+        for task, input in zip(self.requires(), self.input()):
+            df = df.append({
+                'variable': task.variable,
+                'compressed': task.compressed,
+                'size': self.size_in_mb(input.path),
+                'threshold': task.threshold
+            }, ignore_index=True)
+        df.to_csv(self.output().path, index=False)
+        # def run(self):
+        #     df = pd.DataFrame()
+        #     original = Dataset(self.input()['original'].path)
+        #     nol = original['atm_nol'][...]
+        #     alt = original['atm_altitude'][...]
+        #     avk = original['state/WV/atm_avk'][...]
+        #     original.close()
+        #     wv_error = WaterVapourError(nol, alt)
+        #     error = wv_error.smoothing_error_all_measurements(avk)
+        #     a_error = wv_error.smoothing_error_aposteriori(avk)
+        #     for task, input in zip(self.requires()['single_variable'], self.input()['single_variable']):
+        #         nc = Dataset(input.path)
+        #         if isinstance(nc['state/WV/atm_avk'], Variable):
+        #             # avk is not decomposed
+        #             avk_rc = nc['state/WV/atm_avk']
+        #         else:
+        #             avk_rc = Composition.factory(
+        #                 nc['state/WV/atm_avk']).reconstruct(nol)
+        #         diff = wv_error.smoothing_error_all_measurements(
+        #             avk, avk_rc=avk_rc)
+        #         a_diff = wv_error.smoothing_error_aposteriori(
+        #             avk, avk_rc=avk_rc)
+        #         df = df.append({
+        #             'variable': task.variable,
+        #             'compressed': task.compressed,
+        #             'size': self.size_in_kb(input.path),
+        #             'threshold': task.threshold,
+        #             'err_min': error[0],
+        #             'err_mean': error[1],
+        #             'err_max': error[2],
+        #             'err_apost_min': a_error[0],
+        #             'err_apost_mean': a_error[1],
+        #             'err_apost_max': a_error[2],
+        #             'diff_min': diff[0],
+        #             'diff_mean': diff[1],
+        #             'diff_max': diff[2],
+        #             'diff_apost_min': a_diff[0],
+        #             'diff_apost_mean': a_diff[1],
+        #             'diff_apost_max': a_diff[2]
+        #             # 'file': task.file,
+        #         }, ignore_index=True)
+        #         nc.close()
+        #     print('\n', df)
+        #     df.to_csv(self.output().path, index=False)
 
 
 class WaterVapourError:
@@ -118,7 +127,7 @@ class WaterVapourError:
             cov = Covariance(l, self.alt[event])
             if avk_rc is None:
                 expected = np.identity(2*l)
-            else : 
+            else:
                 expected = AssembleFourQuadrants().transform(avk_rc[event], l)
                 expected = cov.avk_traf(expected)
             avk_event = AssembleFourQuadrants().transform(avk[event], l)
