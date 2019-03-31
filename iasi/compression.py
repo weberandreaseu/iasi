@@ -76,6 +76,7 @@ class DecompressDataset(CopyNetcdfFile):
 
 
 class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
+    gas = luigi.Parameter(default=None)
     variable = luigi.Parameter()
     compressed = luigi.BoolParameter()
 
@@ -101,7 +102,11 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
         output = Dataset(self.output().path, 'w', format=self.format)
         self.copy_dimensions(input, output)
         # attribute can be netcdf variable or group (in case of decomposition)
-        attribute = input[self.variable]
+        if self.gas:
+            var_path = os.path.join('/state', self.gas, self.variable)
+        else:
+            var_path = self.variable
+        attribute = input[var_path]
         if isinstance(attribute, Group):
             for var in attribute.variables.values():
                 self.copy_variable(output, var, attribute.path,
