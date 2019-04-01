@@ -89,8 +89,8 @@ class TestCopyNetcdf(unittest.TestCase):
             dst='/tmp/iasi/single',
             force=True,
             variable='state/WV/atm_avk',
-            compressed=bool
-        ) for bool in [False, True]]
+            ancestor=ancestor
+        ) for ancestor in ['MoveVariables', 'CompressDataset', 'DecompressDataset']]
         assert luigi.build(tasks, local_scheduler=True)
         # output from move variables (uncompressed)
         with Dataset(tasks[0].output().path, 'r') as nc:

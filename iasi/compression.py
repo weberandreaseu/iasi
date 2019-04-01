@@ -78,24 +78,37 @@ class DecompressDataset(CopyNetcdfFile):
 class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
     gas = luigi.Parameter(default=None)
     variable = luigi.Parameter()
+    ancestor = luigi.Parameter(default='MoveVariables')
     compressed = luigi.BoolParameter()
+    decompressed = luigi.BoolParameter()
 
     def requires(self):
-        if self.compressed:
+        if self.ancestor == 'MoveVariables':
+            return MoveVariables(dst=self.dst, file=self.file)
+        if self.ancestor == 'CompressDataset':
             return CompressDataset(
                 dst=self.dst,
                 file=self.file,
                 threshold=self.threshold
-                # force=self.force
             )
-        else:
-            return MoveVariables(dst=self.dst, file=self.file)
+        if self.ancestor == "DecompressDataset":
+            return DecompressDataset(
+                dst=self.dst,
+                file=self.file,
+                threshold=self.threshold
+            )
+        raise ValueError(
+            f'Undefined ancestor {self.ancestor} for variable selection')
 
     def output(self):
-        if self.compressed:
-            return self.create_local_target('single', 'compressed', self.variable, str(self.threshold), file=self.file)
-        else:
-            return self.create_local_target('single', 'uncompressed', self.variable, file=self.file)
+        var = f'{self.gas}/{self.variable}' if self.gas else self.variable
+        if self.ancestor == 'MoveVariables':
+            return self.create_local_target('single', 'original', var, str(self.threshold), file=self.file)
+        if self.ancestor == 'CompressDataset':
+            return self.create_local_target('single', 'compressed', var, str(self.threshold), file=self.file)
+        if self.ancestor == 'DecompressDataset':
+            return self.create_local_target('single', 'decompressed', self.variable, str(self.threshold), file=self.file)
+        raise ValueError(f'Undefined ancestor {self.ancestor}')
 
     def run(self):
         input = Dataset(self.input().path, 'r')

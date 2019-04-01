@@ -11,7 +11,7 @@ from iasi.composition import Composition
 from iasi.file import MoveVariables
 from iasi.util import CustomTask
 from iasi.metrics import Covariance
-from iasi.quadrant import AssembleFourQuadrants
+from iasi.quadrant import Quadrant
 
 
 class EvaluationTask(CustomTask):
@@ -21,7 +21,7 @@ class EvaluationTask(CustomTask):
 
     def requires(self):
         compression_parameter = {
-            'compressed': [True],
+            'ancestor': ['CompressDataset'],
             'file': [self.file],
             'dst': [self.dst],
             'force': [self.force],
@@ -34,7 +34,7 @@ class EvaluationTask(CustomTask):
                  for params in compressed_param_grid]
         # for uncompressed dataset we do not need multiple threshold values
         uncompressed_parameter = {
-            'compressed': [False],
+            'ancestor': ['MoveVariables'],
             'file': [self.file],
             'dst': [self.dst],
             'force': [self.force],
@@ -88,8 +88,7 @@ class EvaluationErrorEstimation(EvaluationTask):
             # group tasks and input by gas
             gas_task_and_input = filter(
                 lambda tai: tai[0].gas == gas, tasks_and_input)
-            # TODO get alt and nol
-            gas_error_estimation = ErrorEstimation.factory(gas, None, None)
+            gas_error_estimation = ErrorEstimation.factory(gas, nol, alt)
             for task, input in gas_task_and_input:
                 # output_df, task, gas, variables
                 nc = Dataset(input.path)
@@ -101,7 +100,6 @@ class EvaluationErrorEstimation(EvaluationTask):
                         nc[path]).reconstruct(nol)
                 else:
                     approx_values = nc[path][...]
-
                 original_values = original[path][...]
                 report = gas_error_estimation.report_for(
                     var, original_values, approx_values)
@@ -136,11 +134,15 @@ class ErrorEstimation:
         self.alt = alt
 
     def report_for(self, variable, original, approximated) -> pd.DataFrame:
+        assert original.shape == approximated.shape
         # columns:
         # var | event | type (l1/l2) | err | diff | eps
-
-        for event in range(100):
-            pass
+        df = pd.DataFrame()
+        for event in range(original.shape[0]):
+            if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
+                continue
+            e_nol = self.nol.data[event]
+            e_cov = Covariance(e_nol, self.alt[event])
             # read original akv and avk_rc
 
     def avaraging_kernel(self):
