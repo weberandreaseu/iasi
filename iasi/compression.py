@@ -113,6 +113,6 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
                                    compressed=self.compressed)
         else:
             assert isinstance(attribute, Variable)
-            path, _ = os.path.split(self.variable)
+            path, _ = os.path.split(var_path)
             self.copy_variable(output, attribute, path,
                                compressed=self.compressed)

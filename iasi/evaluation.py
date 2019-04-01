@@ -43,7 +43,10 @@ class EvaluationTask(CustomTask):
             'variable': self.variables
         }
         uncompressed_param_grid = list(ParameterGrid(uncompressed_parameter))
-        return tasks + [SelectSingleVariable(**params) for params in uncompressed_param_grid]
+        return {
+            'single': tasks + [SelectSingleVariable(**params) for params in uncompressed_param_grid],
+            'original': MoveVariables(dst=self.dst, file=self.file)
+        }
 
     def run(self):
         raise NotImplementedError
@@ -63,7 +66,7 @@ class EvaluationCompressionSize(EvaluationTask):
     def run(self):
         # get size for all parameters
         df = pd.DataFrame()
-        for task, input in zip(self.requires(), self.input()):
+        for task, input in zip(self.requires()['single'], self.input()['single']):
             df = df.append({
                 'variable': task.variable,
                 'compressed': task.compressed,
@@ -75,12 +78,92 @@ class EvaluationCompressionSize(EvaluationTask):
 
 class EvaluationErrorEstimation(EvaluationTask):
     def run(self):
-        pass
+        tasks_and_input = zip(
+            self.requires()['single'], self.input()['single'])
+        original = Dataset(self.input()['original'].path)
+        nol = original['atm_nol'][...]
+        alt = original['atm_altitude'][...]
+        for gas in self.gases:
+            gas_report = pd.DataFrame()
+            # group tasks and input by gas
+            gas_task_and_input = filter(
+                lambda tai: tai[0].gas == gas, tasks_and_input)
+            # TODO get alt and nol
+            gas_error_estimation = ErrorEstimation.factory(gas, None, None)
+            for task, input in gas_task_and_input:
+                # output_df, task, gas, variables
+                nc = Dataset(input.path)
+                var = task.variable
+                path = f'/state/{gas}/{var}'
+                if isinstance(nc[path], Group):
+                    # variable is decomposed
+                    approx_values = Composition.factory(
+                        nc[path]).reconstruct(nol)
+                else:
+                    approx_values = nc[path][...]
+
+                original_values = original[path][...]
+                report = gas_error_estimation.report_for(
+                    var, original_values, approx_values)
+                # TODO extend report
+                nc.close()
+            with self.output()[gas].open('w') as file:
+                gas_report.to_csv(file)
+        original.close()
 
     def output(self):
-        # one error estimation report vor each gas
-        return {'WV': self.create_local_target('error-estimation', 'WV', file=self.file, ext='csv')}
-        # return {gas: self.create_local_target('error-estimation', gas, file=self.file, ext='csv') for gas in self.gases}
+        # one error estimation report for each gas
+        return {gas: self.create_local_target('error-estimation', gas, file=self.file, ext='csv') for gas in self.gases}
+
+
+class ErrorEstimation:
+    levels_of_interest = []
+
+    @staticmethod
+    def factory(gas: str, nol, alt):
+        if gas == 'WV':
+            return WaterVapour(nol, alt, type_two=True)
+        if gas == 'GHG':
+            return GreenhouseGas(nol, alt)
+        if gas == 'HNO3':
+            return NitridAcid(nol, alt)
+        raise ValueError(f'No error estimation implementation for gas {gas}')
+
+    def __init__(self, nol, alt, type_two=False):
+        # each gas may have multiple levels of interest
+        self.type_two = type_two
+        self.nol = nol
+        self.alt = alt
+
+    def report_for(self, variable, original, approximated) -> pd.DataFrame:
+        # columns:
+        # var | event | type (l1/l2) | err | diff | eps
+
+        for event in range(100):
+            pass
+            # read original akv and avk_rc
+
+    def avaraging_kernel(self):
+        raise NotImplementedError
+
+    def noise_matrix(self):
+        raise NotImplementedError
+
+    def cross_averaging_kernel(self):
+        raise NotImplementedError
+
+
+class WaterVapour(ErrorEstimation):
+    levels_of_interest = [-16, -20]
+    # for each method type one and type two
+
+
+class GreenhouseGas(ErrorEstimation):
+    levels_of_interest = [-10, -19]
+
+
+class NitridAcid(ErrorEstimation):
+    levels_of_interest = [-6]
 
     # def run(self):
     #     df = pd.DataFrame()
@@ -194,44 +277,3 @@ class WaterVapourError:
             err_mean += s_err[current_level, current_level]
             n += 1
         return (err_min, err_mean / n, err_max)
-
-
-class ErrorEstimation:
-    levels_of_interest = []
-
-    def __init__(self):
-        # each gas may have multiple levels of interest
-        type_two = True
-
-    def procduce_csv(self):
-        # columns:
-        # var | event | type (l1/l2) | err | diff | eps
-
-        for event in range(100):
-            pass
-            # read original akv and avk_rc
-
-    def avaraging_kernel(self):
-        raise NotImplementedError
-
-    def noise_matrix(self):
-        raise NotImplementedError
-
-    def cross_averaging_kernel(self):
-        raise NotImplementedError
-
-
-class WaterVapour:
-    levels_of_interest = [-16, -20]
-    # for each method type one and type two
-    pass
-
-
-class GreenhouseGases:
-    levels_of_interest = [-10, -19]
-    pass
-
-
-class NitridAcid:
-    levels_of_interest = [-6]
-    pass

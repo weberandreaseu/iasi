@@ -5,6 +5,7 @@ from iasi.evaluation import EvaluationCompressionSize, EvaluationErrorEstimation
 
 
 class TestEvaluation(unittest.TestCase):
+
     def test_compression_size(self):
         task = EvaluationCompressionSize(
             file='test/resources/MOTIV-single-event.nc',
