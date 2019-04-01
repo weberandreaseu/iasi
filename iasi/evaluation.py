@@ -122,16 +122,13 @@ class EvaluationErrorEstimation(EvaluationTask):
                 nc = Dataset(input.path)
                 var = task.variable
                 path = f'/state/{gas}/{var}'
-                if isinstance(nc[path], Group):
-                    # variable is decomposed
-                    approx_values = Composition.factory(
-                        nc[path]).reconstruct(nol)
-                else:
-                    approx_values = nc[path][...]
+                approx_values = nc[path][...]
                 original_values = original[path][...]
                 report = gas_error_estimation.report_for(
-                    var, original_values, approx_values)
+                    original[path], original_values, approx_values)
                 # TODO extend report
+                report['threshold'] = task.threshold
+                gas_report = gas_report.append(report)
                 nc.close()
             with self.output()[gas].open('w') as file:
                 gas_report.to_csv(file)
@@ -161,17 +158,37 @@ class ErrorEstimation:
         self.nol = nol
         self.alt = alt
 
-    def report_for(self, variable, original, approximated) -> pd.DataFrame:
+    def report_for(self, variable: Variable, original, approximated) -> pd.DataFrame:
         assert original.shape == approximated.shape
         # columns:
         # var | event | type (l1/l2) | err | diff | eps
-        df = pd.DataFrame()
+        result = {
+            'event': [],
+            'level_of_interest': [],
+            'err': [],
+            'diff': []
+        }
+        reshaper = Quadrant.for_assembly(variable)
         for event in range(original.shape[0]):
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
             e_nol = self.nol.data[event]
+            e_original = reshaper.transform(original[event], e_nol)
+            e_approx = reshaper.transform(approximated[event], e_nol)
             e_cov = Covariance(e_nol, self.alt[event])
+            e_err = e_cov.smoothing_error_covariance(
+                e_original, np.identity(2 * e_nol))
+            e_diff = e_cov.smoothing_error_covariance(e_original, e_approx)
+            for loi in [-10]:
+                level = e_nol + loi
+                if level < 2:
+                    continue
+                result['event'].append(event)
+                result['level_of_interest'].append(level)
+                result['err'].append(e_err[level, level])
+                result['diff'].append(e_diff[level, level])
             # read original akv and avk_rc
+        return pd.DataFrame(result)
 
     def avaraging_kernel(self):
         raise NotImplementedError
