@@ -182,7 +182,7 @@ class ErrorEstimation:
                 original_type1 = e_cov.avk_traf(e_original)
                 e_err = e_cov.smoothing_error_covariance(
                     original_type1, np.identity(2 * e_nol))
-            for loi in [-10]:
+            for loi in [-16]:
                 level = e_nol + loi
                 if level < 2:
                     continue

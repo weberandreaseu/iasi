@@ -1,3 +1,4 @@
+import pandas as pd
 import luigi
 import unittest
 
@@ -12,7 +13,6 @@ class TestEvaluation(unittest.TestCase):
             # file='data/input/MOTIV-slice-1000.nc',
             dst='/tmp/iasi',
             force_upstream=True,
-            # TODO make test not sensitive to leading root '/'
             gases=['WV'],
             variables=['atm_avk']
         )
@@ -23,9 +23,15 @@ class TestEvaluation(unittest.TestCase):
             file='test/resources/MOTIV-single-event.nc',
             # file='data/input/MOTIV-slice-1000.nc',
             dst='/tmp/iasi',
-            force=True,
-            # TODO make test not sensitive to leading root '/'
+            force_upstream=True,
             gases=['WV'],
             variables=['atm_avk']
         )
         assert luigi.build([task], local_scheduler=True)
+        df = pd.read_csv(task.output()['WV'].path)
+        error_wv_16 = df[(df['rc_error'] == False) & (
+            df['level_of_interest'] == -16)]
+        self.assertAlmostEqual(error_wv_16.err.values[0], 0.12626536984680686)
+        rc_error_wv_16 = df[(df['rc_error']) & (
+            df['level_of_interest'] == -16) & (df['threshold'] == 0.001)]
+        self.assertAlmostEqual(rc_error_wv_16.err.values[0], 1.510003e-08)
