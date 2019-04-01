@@ -1,17 +1,18 @@
+import math
 import os
 
 import luigi
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import ParameterGrid
 from netCDF4 import Dataset, Group, Variable
+from sklearn.model_selection import ParameterGrid
 
-from iasi.compression import CompressDataset, SelectSingleVariable
 from iasi.composition import Composition
+from iasi.compression import CompressDataset, SelectSingleVariable
 from iasi.file import MoveVariables
-from iasi.util import CustomTask
 from iasi.metrics import Covariance
 from iasi.quadrant import Quadrant
+from iasi.util import CustomTask
 
 
 class EvaluationTask(luigi.Config, CustomTask):
@@ -42,7 +43,7 @@ class EvaluationCompressionSize(EvaluationTask):
             'file': [self.file],
             'dst': [self.dst],
             'force': [self.force],
-            'threshold': [np.nan],
+            'threshold': [0],
             'gas': self.gases,
             'variable': self.variables
         }
@@ -66,7 +67,7 @@ class EvaluationCompressionSize(EvaluationTask):
             print(task.param_kwargs)
             df = df.append({
                 'variable': task.variable,
-                'compressed': task.ancestor,
+                'ancestor': task.ancestor,
                 'size': self.size_in_kb(input.path),
                 'threshold': task.threshold
             }, ignore_index=True)
@@ -95,7 +96,7 @@ class EvaluationErrorEstimation(EvaluationTask):
             'dst': [self.dst],
             'force': [self.force],
             'force_upstream': [self.force_upstream],
-            'threshold': [np.nan],
+            'threshold': [0],
             'gas': self.gases,
             'variable': self.variables
         }
@@ -125,13 +126,13 @@ class EvaluationErrorEstimation(EvaluationTask):
                 approx_values = nc[path][...]
                 original_values = original[path][...]
                 report = gas_error_estimation.report_for(
-                    original[path], original_values, approx_values)
-                # TODO extend report
+                    original[path], original_values, approx_values, task.ancestor != 'MoveVariables')
                 report['threshold'] = task.threshold
+                report['var'] = task.variable
                 gas_report = gas_report.append(report)
                 nc.close()
             with self.output()[gas].open('w') as file:
-                gas_report.to_csv(file)
+                gas_report.to_csv(file, index=False)
         original.close()
 
     def output(self):
@@ -158,7 +159,7 @@ class ErrorEstimation:
         self.nol = nol
         self.alt = alt
 
-    def report_for(self, variable: Variable, original, approximated) -> pd.DataFrame:
+    def report_for(self, variable: Variable, original, approximated, rc_error) -> pd.DataFrame:
         assert original.shape == approximated.shape
         # columns:
         # var | event | type (l1/l2) | err | diff | eps
@@ -166,27 +167,30 @@ class ErrorEstimation:
             'event': [],
             'level_of_interest': [],
             'err': [],
-            'diff': []
+            'rc_error': []
         }
         reshaper = Quadrant.for_assembly(variable)
         for event in range(original.shape[0]):
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
+            # if threshold is nan task input is uncompressed -> calc only error
             e_nol = self.nol.data[event]
             e_original = reshaper.transform(original[event], e_nol)
-            e_approx = reshaper.transform(approximated[event], e_nol)
             e_cov = Covariance(e_nol, self.alt[event])
-            e_err = e_cov.smoothing_error_covariance(
-                e_original, np.identity(2 * e_nol))
-            e_diff = e_cov.smoothing_error_covariance(e_original, e_approx)
+            if rc_error:
+                e_approx = reshaper.transform(approximated[event], e_nol)
+                e_err = e_cov.smoothing_error_covariance(e_original, e_approx)
+            else:
+                e_err = e_cov.smoothing_error_covariance(
+                    e_original, np.identity(2 * e_nol))
             for loi in [-10]:
                 level = e_nol + loi
                 if level < 2:
                     continue
                 result['event'].append(event)
-                result['level_of_interest'].append(level)
+                result['level_of_interest'].append(loi)
                 result['err'].append(e_err[level, level])
-                result['diff'].append(e_diff[level, level])
+                result['rc_error'].append(rc_error)
             # read original akv and avk_rc
         return pd.DataFrame(result)
 

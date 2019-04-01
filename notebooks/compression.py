@@ -8,7 +8,7 @@ import pandas as pd
 from iasi.evaluation import EvaluationCompressionSize
 
 task = EvaluationCompressionSize(
-    force_upstream=True,
+    force=True,
     dst='data',
     file='data/input/MOTIV-slice-1000.nc',
     # file='test/resources/MOTIV-single-event.nc',

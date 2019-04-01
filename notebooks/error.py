@@ -1,57 +1,33 @@
 # %%
-from iasi.metrics import Covariance
+import matplotlib
+import luigi
 import matplotlib.pyplot as plt
 import numpy as np
-from netCDF4 import Dataset
-from iasi.composition import Composition
-from iasi.quadrant import AssembleFourQuadrants
-# water vapour
+import pandas as pd
 
-# Traf transformiert vom {ln[H2O], ln[HDO]} Koordinatensystem ins
-# {0.5*(ln[H2O]+ln[HDO]),  ln[HDO]-ln[H2O]} Koordinatensystem.
+from iasi.evaluation import EvaluationErrorEstimation
 
-event = 0
-nc_rc = Dataset('/tmp/iasi/compression/0.001/MOTIV-single-event.nc')
-nc = Dataset('/tmp/iasi/groups/MOTIV-single-event.nc')
-nol = nc['atm_nol'][...]
-alt = nc['atm_altitude'][...]
-avk = nc['/state/WV/atm_avk']
+task = EvaluationErrorEstimation(
+    force=True,
+    dst='data',
+    file='data/input/MOTIV-slice-100.nc',
+    # file='test/resources/MOTIV-single-event.nc',
+    gases=['WV'],
+    variables=['atm_avk']
+)
 
-composition = Composition.factory(nc_rc['/state/WV/atm_avk'])
-avk_rc = composition.reconstruct(nol)
-avk_rc = AssembleFourQuadrants(None).transform(avk_rc[event], nol.data[event])
-avk = AssembleFourQuadrants(None).transform(avk[event], nol.data[event])
+assert luigi.build([task], local_scheduler=True)
 
-level = nol.data[event]
-alt = alt.data[event]
+df = pd.read_csv(task.output()['WV'].path)
+df.head()
 
-cov = Covariance(level, alt)
-s_err = cov.smoothing_error_covariance(avk, np.eye(2*level))
-s_diff = cov.smoothing_error_covariance(avk, avk_rc)
+#%%
+df.groupby('threshold')['err'].mean().plot.bar()
 
-plt.imshow(cov.apriori_covariance())
-# plt.imshow((avk - np.identity(2 * level)).T)
-plt.colorbar()
-plt.title('S atm')
-plt.show()
-
-plt.imshow(s_err)
-plt.colorbar()
-plt.title('S err')
-plt.show()
-
-plt.imshow(s_diff)
-plt.colorbar()
-plt.title('S diff')
-plt.show()
-
-
-np.diag(s_err)
-plt.plot(np.diag(s_err))
-plt.title('S err')
-plt.show()
-
-np.diag(s_diff)
-plt.plot(np.diag(s_diff))
-plt.title('S diff')
+# %%
+ax = df.plot.bar(x='threshold', y='size', rot=0, legend=False)
+# ax.legend(loc='upper left')
+ax.set_ylabel('File size in kB')
+ax.set_xlabel('Threshold for eigenvalue selection')
+plt.title(f'Data size reduction for {task.variables[0]}')
 plt.show()
