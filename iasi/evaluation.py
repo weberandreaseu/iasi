@@ -63,8 +63,6 @@ class EvaluationCompressionSize(EvaluationTask):
         # get size for all parameters
         df = pd.DataFrame()
         for task, input in zip(self.requires()['single'], self.input()['single']):
-            print(input.path)
-            print(task.param_kwargs)
             df = df.append({
                 'variable': task.variable,
                 'ancestor': task.ancestor,
@@ -167,13 +165,13 @@ class ErrorEstimation:
             'event': [],
             'level_of_interest': [],
             'err': [],
-            'rc_error': []
+            'rc_error': [],
+            'type': []
         }
         reshaper = Quadrant.for_assembly(variable)
         for event in range(original.shape[0]):
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
-            # if threshold is nan task input is uncompressed -> calc only error
             e_nol = self.nol.data[event]
             e_original = reshaper.transform(original[event], e_nol)
             e_cov = Covariance(e_nol, self.alt[event])
@@ -181,8 +179,9 @@ class ErrorEstimation:
                 e_approx = reshaper.transform(approximated[event], e_nol)
                 e_err = e_cov.smoothing_error_covariance(e_original, e_approx)
             else:
+                original_type1 = e_cov.avk_traf(e_original)
                 e_err = e_cov.smoothing_error_covariance(
-                    e_original, np.identity(2 * e_nol))
+                    original_type1, np.identity(2 * e_nol))
             for loi in [-10]:
                 level = e_nol + loi
                 if level < 2:
@@ -191,6 +190,7 @@ class ErrorEstimation:
                 result['level_of_interest'].append(loi)
                 result['err'].append(e_err[level, level])
                 result['rc_error'].append(rc_error)
+                result['type'].append(1)
             # read original akv and avk_rc
         return pd.DataFrame(result)
 
