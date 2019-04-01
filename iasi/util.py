@@ -25,8 +25,10 @@ class ForceableTask(luigi.Task):
             done = False
             tasks = [self]
             while not done:
-                outputs = luigi.task.flatten(tasks[0].output())
-                [os.remove(out.path) for out in outputs if out.exists()]
+                if not issubclass(tasks[0].__class__, luigi.ExternalTask):
+                    # do not delete output of external tasks
+                    outputs = luigi.task.flatten(tasks[0].output())
+                    [os.remove(out.path) for out in outputs if out.exists()]
                 if self.force_upstream is True:
                     tasks += luigi.task.flatten(tasks[0].requires())
                 tasks.pop(0)

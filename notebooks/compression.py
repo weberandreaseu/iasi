@@ -8,7 +8,7 @@ import pandas as pd
 from iasi.evaluation import EvaluationCompressionSize
 
 task = EvaluationCompressionSize(
-    force=True,
+    force_upstream=True,
     dst='data',
     file='data/input/MOTIV-slice-1000.nc',
     # file='test/resources/MOTIV-single-event.nc',
@@ -18,7 +18,7 @@ task = EvaluationCompressionSize(
 
 assert luigi.build([task], local_scheduler=True)
 
-df = pd.read_csv(task.output().open('r'), dtype={'compressed': bool})
+df = pd.read_csv(task.output().open('r'))
 df.head()
 
 # %%

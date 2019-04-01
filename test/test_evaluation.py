@@ -11,7 +11,7 @@ class TestEvaluation(unittest.TestCase):
             file='test/resources/MOTIV-single-event.nc',
             # file='data/input/MOTIV-slice-1000.nc',
             dst='/tmp/iasi',
-            force=True,
+            force_upstream=True,
             # TODO make test not sensitive to leading root '/'
             gases=['WV'],
             variables=['atm_avk']

@@ -14,10 +14,13 @@ from iasi.metrics import Covariance
 from iasi.quadrant import Quadrant
 
 
-class EvaluationTask(CustomTask):
+class EvaluationTask(luigi.Config, CustomTask):
     file = luigi.Parameter()
     gases = luigi.ListParameter()
     variables = luigi.ListParameter()
+
+
+class EvaluationCompressionSize(EvaluationTask):
 
     def requires(self):
         compression_parameter = {
@@ -25,6 +28,7 @@ class EvaluationTask(CustomTask):
             'file': [self.file],
             'dst': [self.dst],
             'force': [self.force],
+            'force_upstream': [self.force_upstream],
             'threshold': [1e-2, 1e-3, 1e-4, 1e-5],
             'gas': self.gases,
             'variable': self.variables
@@ -48,15 +52,6 @@ class EvaluationTask(CustomTask):
             'original': MoveVariables(dst=self.dst, file=self.file)
         }
 
-    def run(self):
-        raise NotImplementedError
-
-    def output(self):
-        raise NotImplementedError
-
-
-class EvaluationCompressionSize(EvaluationTask):
-
     def output(self):
         return self.create_local_target('compression-summary', file=self.file, ext='csv')
 
@@ -67,9 +62,11 @@ class EvaluationCompressionSize(EvaluationTask):
         # get size for all parameters
         df = pd.DataFrame()
         for task, input in zip(self.requires()['single'], self.input()['single']):
+            print(input.path)
+            print(task.param_kwargs)
             df = df.append({
                 'variable': task.variable,
-                'compressed': task.compressed,
+                'compressed': task.ancestor,
                 'size': self.size_in_kb(input.path),
                 'threshold': task.threshold
             }, ignore_index=True)
@@ -77,6 +74,37 @@ class EvaluationCompressionSize(EvaluationTask):
 
 
 class EvaluationErrorEstimation(EvaluationTask):
+    def requires(self):
+        compression_parameter = {
+            'ancestor': ['DecompressDataset'],
+            'file': [self.file],
+            'dst': [self.dst],
+            'force': [self.force],
+            'force_upstream': [self.force_upstream],
+            'threshold': [1e-2, 1e-3, 1e-4, 1e-5],
+            'gas': self.gases,
+            'variable': self.variables
+        }
+        compressed_param_grid = list(ParameterGrid(compression_parameter))
+        tasks = [SelectSingleVariable(**params)
+                 for params in compressed_param_grid]
+        # for uncompressed dataset we do not need multiple threshold values
+        uncompressed_parameter = {
+            'ancestor': ['MoveVariables'],
+            'file': [self.file],
+            'dst': [self.dst],
+            'force': [self.force],
+            'force_upstream': [self.force_upstream],
+            'threshold': [np.nan],
+            'gas': self.gases,
+            'variable': self.variables
+        }
+        uncompressed_param_grid = list(ParameterGrid(uncompressed_parameter))
+        return {
+            'single': tasks + [SelectSingleVariable(**params) for params in uncompressed_param_grid],
+            'original': MoveVariables(dst=self.dst, file=self.file, force=self.force, force_upstream=self.force_upstream)
+        }
+
     def run(self):
         tasks_and_input = zip(
             self.requires()['single'], self.input()['single'])
