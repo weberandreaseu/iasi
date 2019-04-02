@@ -54,7 +54,7 @@ class TestEvaluation(unittest.TestCase):
                          'More results than expected')
         self.assertAlmostEqual(
             err_wv_avk_type1.err.values[0],
-            0.12626536984680686,
+            0.0786345470381124,
             msg='Wrong value for type 1 error'
         )
 
@@ -67,7 +67,7 @@ class TestEvaluation(unittest.TestCase):
         self.assertAlmostEqual(
             rc_err_wv_avk_type1.err.values[0],
             1.510003e-08,
-            msg='Wrong value for type 2 rc_error'
+            msg='Wrong value for type 1 rc_error'
         )
 
         ##### type 2 error #####
@@ -82,13 +82,12 @@ class TestEvaluation(unittest.TestCase):
         self.assertEqual(len(rc_err_wv_avk_type2), 1,
                          'More results than expected')
         self.assertLess(
-            rc_err_wv_avk_type2.err.values[0],
             rc_err_wv_avk_type1.err.values[0],
-            'Type 2 rc_error should be smaller than type 1 rc_error'
+            rc_err_wv_avk_type2.err.values[0],
+            'Type 1 rc_error should be smaller than type 2 rc_error'
         )
-
-        # self.assertLess(
-        #     err_wv_avk_type2.err.values[0],
-        #     err_wv_avk_type1.err.values[0],
-        #     'Type 2 error should be smaller than type 1 error'
-        # )
+        self.assertLess(
+            err_wv_avk_type1.err.values[0],
+            err_wv_avk_type2.err.values[0],
+            'Type 1 error should be smaller than type 2 error'
+        )

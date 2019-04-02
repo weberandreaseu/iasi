@@ -25,7 +25,7 @@ class Covariance:
         return np.block([[np.identity(self.nol)*0.5, np.identity(self.nol)*0.5],
                          [-np.identity(self.nol), np.identity(self.nol)]])
 
-    def apriori_covariance_traf(self):
+    def type1_covariance(self):
         """Sa' (see equation 7)
 
         A priori covariance of {(ln[H2O]+ln[HDO])/2 and ln[HDO]-ln[H2O]} state
@@ -74,7 +74,7 @@ class Covariance:
                       [-A_[self.nol:, :self.nol], np.identity(self.nol)]])
         return C @ A_
 
-    def smoothing_error_covariance(self, measured, expected):
+    def smoothing_error_covariance(self, actual_matrix, to_compare):
         """S's (see equation 11)
         """
-        return (measured - expected) @ self.apriori_covariance() @ (measured - expected).T
+        return (actual_matrix - to_compare) @ self.type1_covariance() @ (actual_matrix - to_compare).T
