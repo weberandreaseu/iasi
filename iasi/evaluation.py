@@ -205,6 +205,23 @@ class WaterVapour(ErrorEstimation):
     # for each method type one and type two
 
     def averaging_kernel(self, event, level_event, original_event, approx_event, rc_error, result) -> None:
+        for type in range(1, 3):
+            if type == 1:
+                e_err = self.type1_error(
+                    event, level_event, original_event, approx_event, rc_error)
+            else:
+                continue
+            for loi in self.levels_of_interest:
+                level = level_event + loi
+                if level < 2:
+                    continue
+                result['event'].append(event)
+                result['level_of_interest'].append(loi)
+                result['err'].append(e_err[level, level])
+                result['rc_error'].append(rc_error)
+                result['type'].append(type)
+
+    def type1_error(self, event, level_event, original_event, approx_event, rc_error):
         e_cov = Covariance(level_event, self.alt[event])
         if rc_error:
             e_err = e_cov.smoothing_error_covariance(
@@ -213,15 +230,7 @@ class WaterVapour(ErrorEstimation):
             original_type1 = e_cov.avk_traf(original_event)
             e_err = e_cov.smoothing_error_covariance(
                 original_type1, np.identity(2 * level_event))
-        for loi in self.levels_of_interest:
-            level = level_event + loi
-            if level < 2:
-                continue
-            result['event'].append(event)
-            result['level_of_interest'].append(loi)
-            result['err'].append(e_err[level, level])
-            result['rc_error'].append(rc_error)
-            result['type'].append(1)
+        return e_err
 
     def noise_matrix(self, event, level_event, original_event, approx_event, rc_error, result):
         cov_event = Covariance(level_event, self.alt[event])
