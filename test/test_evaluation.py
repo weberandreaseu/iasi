@@ -12,9 +12,9 @@ class TestEvaluation(unittest.TestCase):
             file='test/resources/MOTIV-single-event.nc',
             # file='data/input/MOTIV-slice-1000.nc',
             dst='/tmp/iasi',
-            force_upstream=True,
+            force=True,
             gases=['WV'],
-            variables=['atm_avk']
+            variables=['avk']
         )
         assert luigi.build([task], local_scheduler=True)
 
@@ -38,7 +38,7 @@ class TestEvaluation(unittest.TestCase):
             dst='/tmp/iasi',
             force_upstream=True,
             gases=['WV'],
-            variables=['atm_avk', 'atm_n']
+            variables=['avk', 'n']
         )
         assert luigi.build([task], local_scheduler=True)
         df = pd.read_csv(task.output()['WV'].path)
@@ -48,7 +48,7 @@ class TestEvaluation(unittest.TestCase):
         # water vapour: level 16
         # error
         err_wv_avk_type1 = self.filter_by(
-            df, 'atm_avk', -16, rc_error=False
+            df, 'avk', -16, rc_error=False
         )
         self.assertEqual(len(err_wv_avk_type1), 1,
                          'More results than expected')
@@ -60,7 +60,7 @@ class TestEvaluation(unittest.TestCase):
 
         # reconstruction error
         rc_err_wv_avk_type1 = self.filter_by(
-            df, 'atm_avk', -16, rc_error=True, threshold=0.001
+            df, 'avk', -16, rc_error=True, threshold=0.001
         )
         self.assertEqual(len(rc_err_wv_avk_type1), 1,
                          'More results than expected')
@@ -72,12 +72,12 @@ class TestEvaluation(unittest.TestCase):
 
         ##### type 2 error #####
         err_wv_avk_type2 = self.filter_by(
-            df, 'atm_avk', -16, rc_error=False, type=2
+            df, 'avk', -16, rc_error=False, type=2
         )
         self.assertEqual(len(err_wv_avk_type2), 1,
                          'More results than expected')
         rc_err_wv_avk_type2 = self.filter_by(
-            df, 'atm_avk', -16, rc_error=True, type=2, threshold=0.001
+            df, 'avk', -16, rc_error=True, type=2, threshold=0.001
         )
         self.assertEqual(len(rc_err_wv_avk_type2), 1,
                          'More results than expected')

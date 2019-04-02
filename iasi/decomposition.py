@@ -17,12 +17,12 @@ class Decomposition:
     @classmethod
     def factory(cls, variable: Variable, threshold: float = 1e-3):
         cls.threshold = threshold
-        if variable.name.endswith('atm_n'):
+        # noise matrix (n) is symmetric and is qualified for EigenDecomposition
+        if variable.name is 'n' and variable.dimensions[-2:] == ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
             return EigenDecomposition(variable)
         if variable.dimensions[-2:] == ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
             return SingularValueDecomposition(variable)
-        raise DecompositionException(
-            f'Variable {variable.name} cannot be decomposed')
+        raise DecompositionException(f'Variable {variable.name} cannot be decomposed')
 
     # TODO refactor: make methods signature more compact
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
@@ -82,6 +82,7 @@ class SingularValueDecomposition(Decomposition):
                 print(error)
         # write all to output
         upper_dim, lower_dim = q.upper_and_lower_dimension()
+        # TODO add group description
         path = f'{group.path}/{var.name}/'
         U_dim = ('event', lower_dim, lower_dim)
         U_out = output.createVariable(path + 'U', 'f', U_dim, zlib=True)

@@ -13,9 +13,13 @@ class TestCompression(unittest.TestCase):
             file='test/resources/MOTIV-single-event.nc',
             dst='/tmp/iasi',
             force=True,
+            threshold=0.01
         )
-        success = luigi.build([task], local_scheduler=True)
-        self.assertTrue(success)
+        assert luigi.build([task], local_scheduler=True)
+        with Dataset(task.output().path) as nc:
+            state = nc['state']
+            subgroups = state.groups.keys()
+            self.assertListEqual(list(subgroups), ['GHG', 'HNO3', 'Tatm', 'Tskin', 'WV'])
 
     def test_dataset_decompression(self):
         task = DecompressDataset(

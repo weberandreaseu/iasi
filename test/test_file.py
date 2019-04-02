@@ -12,9 +12,24 @@ class TestCopyNetcdf(unittest.TestCase):
 
     file = 'test/resources/IASI-test-single-event.nc'
 
+    def test_exclude_state(self):
+        task = MoveVariables(
+            file='test/resources/MOTIV-single-event.nc',
+            dst='/tmp/iasi/exclude',
+            # any non whitespace string starting with state
+            exclusion_pattern=r'\/?state\S*',
+            force=True
+        )
+        assert luigi.build([task], local_scheduler=True)
+        with Dataset(task.output().path, 'r') as nc:
+            with self.assertRaises(IndexError):
+                # should not be able to access group 'state'
+                nc['state']
+
+    @unittest.skip('created for deprecated task structure')
     def test_copy_full(self):
         task = CopyNetcdfFile(
-            file=self.file,
+            file='test/resources/MOTIV-single-event.nc',
             dst='/tmp/iasi/copy',
             force=True
         )
@@ -29,6 +44,7 @@ class TestCopyNetcdf(unittest.TestCase):
             ]
             self.assertListEqual(vars, expected)
 
+    @unittest.skip('created for deprecated task structure')
     def test_copy_inclusions(self):
         inclusions = ['state_WVatm', 'state_WVatm_a', 'state_WVatm_avk']
         task = CopyNetcdfFile(
@@ -43,6 +59,7 @@ class TestCopyNetcdf(unittest.TestCase):
             vars = list(nc.variables.keys())
             self.assertListEqual(vars, inclusions)
 
+    @unittest.skip('created for deprecated task structure')
     def test_copy_exclusions(self):
         task = CopyNetcdfFile(
             file=self.file,
@@ -60,6 +77,7 @@ class TestCopyNetcdf(unittest.TestCase):
             for exclusion in excluded:
                 self.assertNotIn(exclusion, vars)
 
+    @unittest.skip('created for deprecated task structure')
     def test_move_variables(self):
         task = MoveVariables(
             file='test/resources/MOTIV-single-event.nc',
@@ -87,8 +105,8 @@ class TestCopyNetcdf(unittest.TestCase):
         tasks = [SelectSingleVariable(
             file='test/resources/MOTIV-single-event.nc',
             dst='/tmp/iasi/single',
-            force=True,
-            variable='state/WV/atm_avk',
+            force_upstream=True,
+            variable='state/WV/avk',
             ancestor=ancestor
         ) for ancestor in ['MoveVariables', 'CompressDataset', 'DecompressDataset']]
         assert luigi.build(tasks, local_scheduler=True)
@@ -98,7 +116,7 @@ class TestCopyNetcdf(unittest.TestCase):
             self.assertEqual(len(child_items), 1)
             group, var = child_items[0]
             self.assertEqual(group.path, '/state/WV')
-            self.assertEqual(var.name, 'atm_avk')
+            self.assertEqual(var.name, 'avk')
         # output from compress dataset
         with Dataset(tasks[1].output().path, 'r') as nc:
             child_items = list(child_variables_of(nc))
@@ -106,4 +124,4 @@ class TestCopyNetcdf(unittest.TestCase):
             vars = [var.name for _, var in child_items]
             self.assertListEqual(vars, ['U', 's', 'Vh'])
             groups = [group.path for group, _ in child_items]
-            self.assertListEqual(groups, ['/state/WV/atm_avk'] * 3)
+            self.assertListEqual(groups, ['/state/WV/avk'] * 3)

@@ -170,8 +170,8 @@ class ErrorEstimation:
         }
 
         switcher = {
-            'atm_avk': self.averaging_kernel,
-            'atm_n': self.noise_matrix
+            'avk': self.averaging_kernel,
+            'n': self.noise_matrix
         }
         error_estimation_method = switcher.get(variable.name)
         if error_estimation_method is None:

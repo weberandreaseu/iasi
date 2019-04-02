@@ -50,10 +50,10 @@ class TestComposition(unittest.TestCase):
         return np.equal(a.mask, b.mask).all()
 
     def test_eigen_composition_combined(self):
-        self.verify_eigen_composition('/state/WV/atm_n', (1, 2, 2, 29, 29))
+        self.verify_eigen_composition('/state/WV/n', (1, 2, 2, 29, 29))
 
     def test_eigen_composition_single(self):
-        self.verify_eigen_composition('/state/T/atm_n', (1, 29, 29))
+        self.verify_eigen_composition('/state/Tatm/n', (1, 29, 29))
 
     def verify_eigen_composition(self, attribute: str, shape: Tuple):
         array = self.compressed[attribute]
@@ -75,15 +75,15 @@ class TestComposition(unittest.TestCase):
 
     def test_svd_one_quadrant(self):
         self.verify_singular_value_composition(
-            'state/HNO3/atm_avk', (1, 29, 29))
+            'state/HNO3/avk', (1, 29, 29))
 
     def test_svd_two_quadrants(self):
         self.verify_singular_value_composition(
-            'state/T/atm2GHGatm_xavk', (1, 2, 29, 29))
+            'state/GHG/Tatmxavk', (1, 2, 29, 29))
 
     def test_svd_four_quadrants(self):
         self.verify_singular_value_composition(
-            'state/WV/atm_avk', (1, 2, 2, 29, 29))
+            'state/WV/avk', (1, 2, 2, 29, 29))
 
     def verify_singular_value_composition(self, attribute: str, shape: Tuple):
         avk = self.compressed[attribute]

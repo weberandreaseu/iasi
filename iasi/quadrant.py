@@ -4,6 +4,10 @@ import numpy as np
 from netCDF4 import Dataset, Group, Variable
 
 
+class QuadrantException(Exception):
+    pass
+
+
 class Quadrant:
 
     matches = ('event', 'atmospheric_grid_levels', 'atmospheric_grid_levels')
@@ -12,13 +16,23 @@ class Quadrant:
     def for_assembly(cls, variable: Variable):
         # get and initialize quadrant which assembles the given dimensions
         dimensions = variable.dimensions
-        return next(filter(lambda q: q.matches == dimensions, [cls, AssembleTwoQuadrants, AssembleFourQuadrants]))(variable)
+        first = next(filter(lambda q: q.matches == dimensions, [
+                     cls, AssembleTwoQuadrants, AssembleFourQuadrants]), None)
+        if first is None:
+            raise QuadrantException(
+                f'Cannot find assembly function for {variable.name}')
+        return first(variable)
 
     @classmethod
     def for_disassembly(cls, variable: Variable):
         # get and initialize quadrant which disassembles the given dimensions
         dimensions = variable.dimensions
-        return next(filter(lambda q: q.matches == dimensions, [cls, DisassembleTwoQuadrants, DisassembleFourQuadrants]))(variable)
+        first = next(filter(lambda q: q.matches == dimensions, [
+                     cls, DisassembleTwoQuadrants, DisassembleFourQuadrants]), None)
+        if first is None:
+            raise QuadrantException(
+                f'Cannot find disassembly function for {variable.name}')
+        return first(variable)
 
     def __init__(self, variable: Variable = None):
         self.var = variable

@@ -16,7 +16,7 @@ task = EvaluationErrorEstimation(
     file='data/input/MOTIV-slice-100.nc',
     # file='test/resources/MOTIV-single-event.nc',
     gases=['WV'],
-    variables=['atm_avk', 'atm_n']
+    variables=['avk', 'n']
 )
 
 assert luigi.build([task], local_scheduler=True)
@@ -51,17 +51,16 @@ df.head()
 #
 # ### Averaging Kernel
 # - Level of interest: -16
-plot_error_estimation_for('WV', 'atm_avk', -16)
+plot_error_estimation_for('WV', 'avk', -16)
 
 # %%[markdown]
 # ### Noise Matrix
 # - Level of interest: -16
-plot_error_estimation_for('WV', 'atm_n', -16)
-
+plot_error_estimation_for('WV', 'n', -16)
 
 # %%
 df[
-    (df['var'] == 'atm_avk') &
+    (df['var'] == 'avk') &
     (df['level_of_interest'] == -16)
 ].groupby(['threshold', 'type']).mean()['err'].unstack().plot.bar(logy=True, rot=0)
 plt.show()

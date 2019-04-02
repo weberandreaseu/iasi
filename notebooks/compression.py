@@ -8,12 +8,12 @@ import pandas as pd
 from iasi.evaluation import EvaluationCompressionSize
 
 task = EvaluationCompressionSize(
-    force=True,
+    force_upstream=True,
     dst='data',
     file='data/input/MOTIV-slice-1000.nc',
     # file='test/resources/MOTIV-single-event.nc',
     gases=['WV'],
-    variables=['atm_avk']
+    variables=['avk']
 )
 
 assert luigi.build([task], local_scheduler=True)

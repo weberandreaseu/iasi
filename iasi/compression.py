@@ -20,10 +20,13 @@ class CompressionParams(luigi.Config):
     threshold = luigi.FloatParameter(default=1e-3)
 
 
-@requires(MoveVariables)
 class CompressDataset(CompressionParams, CopyNetcdfFile):
 
-    exclusion_pattern = r"state"
+    # exclude variables starting with state
+    exclusion_pattern = r'\/?state\S*'
+
+    def requires(self):
+        return MoveVariables(file=self.file, dst=self.dst, exclusion_pattern=None, force=self.force)
 
     def output(self):
         return self.create_local_target('compression', str(self.threshold), file=self.file)
@@ -45,7 +48,7 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
                 dec.decompose(output, group, var, levels,
                               dim_species, dim_levels)
             except DecompositionException:
-                self.copy_variable(output, var, group.path)
+                self.copy_variable(output, var, f'{group.path}/{var.name}')
         input.close()
         output.close()
 
@@ -53,7 +56,8 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
 @requires(CompressDataset)
 class DecompressDataset(CompressionParams, CopyNetcdfFile):
 
-    exclusion_pattern = r"state"
+    # exclude variables starting with state
+    exclusion_pattern = r'\/?state\S*'
 
     def output(self):
         return self.create_local_target('decompression', str(self.threshold), file=self.file)
@@ -70,7 +74,8 @@ class DecompressDataset(CompressionParams, CopyNetcdfFile):
                 comp.reconstruct(levels, output)
             except CompositionException:
                 for var in group.variables.values():
-                    self.copy_variable(output, var, group.path)
+                    self.copy_variable(
+                        output, var, path=f'{group.path}/{var.name}')
         input.close()
         output.close()
 
@@ -122,9 +127,9 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
             for var in attribute.variables.values():
                 compressed = self.ancestor == 'CompressDataset'
                 self.copy_variable(
-                    output, var, attribute.path, compressed=compressed)
+                    output, var, f'{attribute.path}/{var.name}', compressed=compressed)
         else:
             assert isinstance(attribute, Variable)
             compressed = self.ancestor == 'CompressDataset'
-            path, _ = os.path.split(var_path)
-            self.copy_variable(output, attribute, path, compressed=compressed)
+            self.copy_variable(output, attribute, var_path,
+                               compressed=compressed)
