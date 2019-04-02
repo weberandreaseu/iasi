@@ -56,20 +56,20 @@ class Covariance:
         P = self.traf()
         return np.linalg.inv(P) @ self.apriori_covariance_traf() @ np.linalg.inv(P.T)
 
-    def avk_traf(self, avk):
+    def type1_of(self, matrix):
         """A' (see equation 10)
 
-        Return tranformed avk
+        Return tranformed martix
         """
         P = self.traf()
-        return P @ avk @ np.linalg.inv(P)
+        return P @ matrix @ np.linalg.inv(P)
 
-    def posteriori_traf(self, avk):
+    def type2_of(self, matrix):
         """A'' (see equation 15)
 
-        A posteriori transformed avk 
+        A posteriori transformed matrix 
         """
-        A_ = self.avk_traf(avk)
+        A_ = self.type1_of(matrix)
         C = np.block([[A_[self.nol:, self.nol:], np.zeros((self.nol, self.nol))],
                       [-A_[self.nol:, :self.nol], np.identity(self.nol)]])
         return C @ A_
