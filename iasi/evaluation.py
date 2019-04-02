@@ -170,7 +170,8 @@ class ErrorEstimation:
         }
 
         switcher = {
-            'atm_avk': self.averaging_kernel
+            'atm_avk': self.averaging_kernel,
+            'atm_n': self.noise_matrix
         }
         error_estimation_method = switcher.get(variable.name)
         if error_estimation_method is None:
@@ -184,7 +185,8 @@ class ErrorEstimation:
             nol_event = self.nol.data[event]
             original_event = reshaper.transform(original[event], nol_event)
             approx_event = reshaper.transform(approximated[event], nol_event)
-            error_estimation_method(event, nol_event, original_event, approx_event, rc_error, result)
+            error_estimation_method(
+                event, nol_event, original_event, approx_event, rc_error, result)
             # read original akv and avk_rc
         return pd.DataFrame(result)
 
@@ -202,7 +204,7 @@ class WaterVapour(ErrorEstimation):
     levels_of_interest = [-16, -20]
     # for each method type one and type two
 
-    def averaging_kernel(self, event, level_event, original_event, approx_event, rc_error, result):
+    def averaging_kernel(self, event, level_event, original_event, approx_event, rc_error, result) -> None:
         e_cov = Covariance(level_event, self.alt[event])
         if rc_error:
             e_err = e_cov.smoothing_error_covariance(
@@ -211,13 +213,31 @@ class WaterVapour(ErrorEstimation):
             original_type1 = e_cov.avk_traf(original_event)
             e_err = e_cov.smoothing_error_covariance(
                 original_type1, np.identity(2 * level_event))
-        for loi in [-16]:
+        for loi in self.levels_of_interest:
             level = level_event + loi
             if level < 2:
                 continue
             result['event'].append(event)
             result['level_of_interest'].append(loi)
             result['err'].append(e_err[level, level])
+            result['rc_error'].append(rc_error)
+            result['type'].append(1)
+
+    def noise_matrix(self, event, level_event, original_event, approx_event, rc_error, result):
+        cov_event = Covariance(level_event, self.alt[event])
+        # original/approx event is already covariance matrix -> only type1/2 transformation
+        err_original = cov_event.avk_traf(original_event)
+        if rc_error:
+            err = err_original - cov_event.avk_traf(approx_event)
+        else:
+            err = err_original
+        for loi in self.levels_of_interest:
+            level = level_event + loi
+            if level < 2:
+                continue
+            result['event'].append(event)
+            result['level_of_interest'].append(loi)
+            result['err'].append(err[level, level])
             result['rc_error'].append(rc_error)
             result['type'].append(1)
 

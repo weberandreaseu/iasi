@@ -36,7 +36,7 @@ def plot_error_estimation_for(gas: str, var: str, level_of_interest: int):
         'err'].mean().plot.bar(logy=True, rot=0)
     mean_error = filter_by(df, var, level_of_interest, False)['err'].mean()
     # set ylim to make line for cov error visible
-    ax.set_ylim(top=1)
+    ax.set_ylim(top=mean_error * 5)
     ax.axhline(mean_error, color='red', label='Error')
     ax.set_ylabel('Reconstruction error')
     ax.set_xlabel('Threshold for eigenvalue selection')
