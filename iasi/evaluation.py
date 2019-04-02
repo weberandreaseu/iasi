@@ -168,33 +168,27 @@ class ErrorEstimation:
             'rc_error': [],
             'type': []
         }
+
+        switcher = {
+            'atm_avk': self.averaging_kernel
+        }
+        error_estimation_method = switcher.get(variable.name)
+        if error_estimation_method is None:
+            raise ValueError(
+                f'No error estimation method for variable {variable.name}')
+
         reshaper = Quadrant.for_assembly(variable)
         for event in range(original.shape[0]):
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
-            e_nol = self.nol.data[event]
-            e_original = reshaper.transform(original[event], e_nol)
-            e_cov = Covariance(e_nol, self.alt[event])
-            if rc_error:
-                e_approx = reshaper.transform(approximated[event], e_nol)
-                e_err = e_cov.smoothing_error_covariance(e_original, e_approx)
-            else:
-                original_type1 = e_cov.avk_traf(e_original)
-                e_err = e_cov.smoothing_error_covariance(
-                    original_type1, np.identity(2 * e_nol))
-            for loi in [-16]:
-                level = e_nol + loi
-                if level < 2:
-                    continue
-                result['event'].append(event)
-                result['level_of_interest'].append(loi)
-                result['err'].append(e_err[level, level])
-                result['rc_error'].append(rc_error)
-                result['type'].append(1)
+            nol_event = self.nol.data[event]
+            original_event = reshaper.transform(original[event], nol_event)
+            approx_event = reshaper.transform(approximated[event], nol_event)
+            error_estimation_method(event, nol_event, original_event, approx_event, rc_error, result)
             # read original akv and avk_rc
         return pd.DataFrame(result)
 
-    def avaraging_kernel(self):
+    def averaging_kernel(self):
         raise NotImplementedError
 
     def noise_matrix(self):
@@ -207,6 +201,25 @@ class ErrorEstimation:
 class WaterVapour(ErrorEstimation):
     levels_of_interest = [-16, -20]
     # for each method type one and type two
+
+    def averaging_kernel(self, event, level_event, original_event, approx_event, rc_error, result):
+        e_cov = Covariance(level_event, self.alt[event])
+        if rc_error:
+            e_err = e_cov.smoothing_error_covariance(
+                original_event, approx_event)
+        else:
+            original_type1 = e_cov.avk_traf(original_event)
+            e_err = e_cov.smoothing_error_covariance(
+                original_type1, np.identity(2 * level_event))
+        for loi in [-16]:
+            level = level_event + loi
+            if level < 2:
+                continue
+            result['event'].append(event)
+            result['level_of_interest'].append(loi)
+            result['err'].append(e_err[level, level])
+            result['rc_error'].append(rc_error)
+            result['type'].append(1)
 
 
 class GreenhouseGas(ErrorEstimation):
