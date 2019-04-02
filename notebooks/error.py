@@ -57,3 +57,11 @@ plot_error_estimation_for('WV', 'atm_avk', -16)
 # ### Noise Matrix
 # - Level of interest: -16
 plot_error_estimation_for('WV', 'atm_n', -16)
+
+
+# %%
+df[
+    (df['var'] == 'atm_avk') &
+    (df['level_of_interest'] == -16)
+].groupby(['threshold', 'type']).mean()['err'].unstack().plot.bar(logy=True, rot=0)
+plt.show()

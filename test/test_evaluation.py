@@ -18,6 +18,19 @@ class TestEvaluation(unittest.TestCase):
         )
         assert luigi.build([task], local_scheduler=True)
 
+    @classmethod
+    def filter_by(cls, df, var: str, level_of_interest: int, type: int = 1, rc_error: bool = True, threshold: float = None) -> pd.DataFrame:
+        filtered = df[
+            (df['var'] == var) &
+            (df['level_of_interest'] == level_of_interest) &
+            (df['type'] == type) &
+            (df['rc_error'] == rc_error)
+        ]
+        if threshold:
+            filtered = filtered[filtered['threshold'] == threshold]
+        assert len(filtered) > 0
+        return filtered
+
     def test_error_estimation(self):
         task = EvaluationErrorEstimation(
             file='test/resources/MOTIV-single-event.nc',
@@ -29,9 +42,53 @@ class TestEvaluation(unittest.TestCase):
         )
         assert luigi.build([task], local_scheduler=True)
         df = pd.read_csv(task.output()['WV'].path)
-        error_wv_16 = df[(df['rc_error'] == False) & (
-            df['level_of_interest'] == -16)]
-        self.assertAlmostEqual(error_wv_16.err.values[0], 0.12626536984680686)
-        rc_error_wv_16 = df[(df['rc_error']) & (
-            df['level_of_interest'] == -16) & (df['threshold'] == 0.001)]
-        self.assertAlmostEqual(rc_error_wv_16.err.values[0], 1.510003e-08)
+
+        ##### type 1 error #####
+
+        # water vapour: level 16
+        # error
+        err_wv_avk_type1 = self.filter_by(
+            df, 'atm_avk', -16, rc_error=False
+        )
+        self.assertEqual(len(err_wv_avk_type1), 1,
+                         'More results than expected')
+        self.assertAlmostEqual(
+            err_wv_avk_type1.err.values[0],
+            0.12626536984680686,
+            msg='Wrong value for type 1 error'
+        )
+
+        # reconstruction error
+        rc_err_wv_avk_type1 = self.filter_by(
+            df, 'atm_avk', -16, rc_error=True, threshold=0.001
+        )
+        self.assertEqual(len(rc_err_wv_avk_type1), 1,
+                         'More results than expected')
+        self.assertAlmostEqual(
+            rc_err_wv_avk_type1.err.values[0],
+            1.510003e-08,
+            msg='Wrong value for type 2 rc_error'
+        )
+
+        ##### type 2 error #####
+        err_wv_avk_type2 = self.filter_by(
+            df, 'atm_avk', -16, rc_error=False, type=2
+        )
+        self.assertEqual(len(err_wv_avk_type2), 1,
+                         'More results than expected')
+        rc_err_wv_avk_type2 = self.filter_by(
+            df, 'atm_avk', -16, rc_error=True, type=2, threshold=0.001
+        )
+        self.assertEqual(len(rc_err_wv_avk_type2), 1,
+                         'More results than expected')
+        self.assertLess(
+            rc_err_wv_avk_type2.err.values[0],
+            rc_err_wv_avk_type1.err.values[0],
+            'Type 2 rc_error should be smaller than type 1 rc_error'
+        )
+
+        # self.assertLess(
+        #     err_wv_avk_type2.err.values[0],
+        #     err_wv_avk_type1.err.values[0],
+        #     'Type 2 error should be smaller than type 1 error'
+        # )

@@ -209,10 +209,9 @@ class WaterVapour(ErrorEstimation):
             if type == 1:
                 e_err = self.type1_error(
                     event, level_event, original_event, approx_event, rc_error)
-            # if type == 2:
-            #     continue
-                # e_err = self.type2_error(
-                #     event, level_event, original_event, approx_event, rc_error)
+            elif type == 2:
+                e_err = self.type2_error(
+                    event, level_event, original_event, approx_event, rc_error)
             else:
                 continue
             for loi in self.levels_of_interest:
@@ -227,18 +226,24 @@ class WaterVapour(ErrorEstimation):
 
     def type1_error(self, event, level_event, original_event, approx_event, rc_error):
         e_cov = Covariance(level_event, self.alt[event])
+        original_type1 = e_cov.type1_of(original_event)
         if rc_error:
+            approx_type1 = e_cov.type1_of(approx_event)
             e_err = e_cov.smoothing_error_covariance(
-                original_event, approx_event)
+                original_type1, approx_type1)
         else:
-            original_type1 = e_cov.type1_of(original_event)
             e_err = e_cov.smoothing_error_covariance(
                 original_type1, np.identity(2 * level_event))
         return e_err
 
     def type2_error(self, event, level_event, original_event, approx_event, rc_error):
-
-        return None
+        e_cov = Covariance(level_event, self.alt[event])
+        original_type2 = e_cov.type2_of(original_event)
+        if rc_error:
+            approx_type2 = e_cov.type2_of(approx_event)
+            return e_cov.smoothing_error_covariance(original_type2, approx_type2)
+        else:
+            return e_cov.smoothing_error_covariance(original_type2, np.identity(2 * level_event))
 
     def noise_matrix(self, event, level_event, original_event, approx_event, rc_error, result):
         cov_event = Covariance(level_event, self.alt[event])
