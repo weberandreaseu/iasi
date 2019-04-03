@@ -44,7 +44,7 @@ class SingularValueComposition(Composition):
         self.Vh = group['Vh']
 
     def reconstruct(self, nol: np.ma.MaskedArray, target: Dataset = None) -> np.ma.MaskedArray:
-        q: Quadrant = Quadrant.for_disassembly(self.Vh)
+        q: Quadrant = Quadrant.for_disassembly(self.U)
         result = np.ma.masked_all(q.transformed_shape(), dtype=np.float32)
         for event in range(self.Vh.shape[0]):
             if np.ma.is_masked(nol[event]) or nol.data[event] > 29:

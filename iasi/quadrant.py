@@ -59,11 +59,14 @@ class AssembleTwoQuadrants(Quadrant):
                'atmospheric_grid_levels', 'atmospheric_grid_levels')
 
     def transform(self, array: np.ma.MaskedArray, levels: int):
-        return np.block([array[0, :levels, :levels], array[1, :levels, :levels]])
+        return np.block([
+            [array[0, :levels, :levels]],
+            [array[1, :levels, :levels]]
+        ])
 
     def transformed_shape(self):
         grid_levels = self.var.shape[3]
-        return (self.var.shape[0], grid_levels, grid_levels * 2)
+        return (self.var.shape[0], grid_levels * 2, grid_levels)
 
     def create_variable(self, output: Dataset, path: str) -> Variable:
         return output.createVariable(path, self.var.datatype,
@@ -74,15 +77,15 @@ class AssembleTwoQuadrants(Quadrant):
 
 
 class DisassembleTwoQuadrants(Quadrant):
-    matches = ('event', 'atmospheric_grid_levels',
-               'double_atmospheric_grid_levels')
+    matches = ('event', 'double_atmospheric_grid_levels',
+               'atmospheric_grid_levels')
 
     def transform(self, array: np.ma.MaskedArray, l: int):
-        d = self.var.shape[1]
-        return np.array([array[:l, :l], array[:l, d:d + l]])
+        d = self.var.shape[2]
+        return np.array([array[:l, :l], array[d:d + l, :l]])
 
     def transformed_shape(self):
-        grid_levels = self.var.shape[1]
+        grid_levels = self.var.shape[2]
         return (self.var.shape[0], 2, grid_levels, grid_levels)
 
     def create_variable(self, output: Dataset, path: str) -> Variable:
@@ -91,7 +94,7 @@ class DisassembleTwoQuadrants(Quadrant):
 
     def assign_disassembly(self, of, to, l):
         to[0, :l, :l] = of[:l, :l]
-        to[1, :l, :l] = of[:l, l:2*l]
+        to[1, :l, :l] = of[l:2*l, :l]
 
 
 class AssembleFourQuadrants(Quadrant):

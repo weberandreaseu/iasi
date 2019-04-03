@@ -37,13 +37,15 @@ class TestQuadrants(unittest.TestCase):
         state = self.uncompressed['state']
         children = child_groups_of(state)
         names = [g.name for g in children]
-        self.assertListEqual(names, ['state', 'GHG', 'HNO3', 'Tatm', 'Tskin', 'WV'])
+        self.assertListEqual(
+            names, ['state', 'GHG', 'HNO3', 'Tatm', 'Tskin', 'WV'])
 
     def test_variables_of_group(self):
         wv = self.uncompressed['state/WV']
         self.assertIsInstance(wv, Group)
         children = [var.name for g, var in child_variables_of(wv)]
-        self.assertListEqual(children, ['r', 'a', 'n', 'avk', 'Tatmxavk', 'Tskinxavk'])
+        self.assertListEqual(
+            children, ['r', 'a', 'n', 'avk', 'Tatmxavk', 'Tskinxavk'])
 
     def test_single_quadrant_assembly(self):
         avk = self.uncompressed['state/HNO3/avk']
@@ -59,10 +61,10 @@ class TestQuadrants(unittest.TestCase):
         xavk = self.uncompressed['state/GHG/Tatmxavk']
         q: Quadrant = Quadrant.for_assembly(xavk)
         self.assertIsInstance(q, AssembleTwoQuadrants)
-        self.assertTupleEqual(q.transformed_shape(), (1, 29, 58))
+        self.assertTupleEqual(q.transformed_shape(), (1, 58, 29))
         array = np.random.uniform(size=(2, 29, 29))
         assembly = q.transform(array, 23)
-        self.assertTupleEqual(assembly.shape, (23, 46))
+        self.assertTupleEqual(assembly.shape, (46, 23))
 
     def test_four_quadrants_assembly(self):
         avk = self.uncompressed['/state/WV/avk']
@@ -85,14 +87,16 @@ class TestQuadrants(unittest.TestCase):
         self.assertTupleEqual(disassembly.shape, (23, 23))
 
     def test_two_quadrant_disassembly(self):
-        xavk = self.compressed['state/GHG/Tatmxavk/Vh']
+        xavk = self.compressed['state/GHG/Tatmxavk/U']
         q: Quadrant = Quadrant.for_disassembly(xavk)
         self.assertIsInstance(q, DisassembleTwoQuadrants)
         self.assertTupleEqual(q.transformed_shape(), (1, 2, 29, 29))
-        array = np.arange(29*58).reshape(29, 58)
+        array = np.arange(29*58).reshape(58, 29)
         disassembly = q.transform(array, 23)
         self.assertTupleEqual(disassembly.shape, (2, 23, 23))
-        close = np.allclose(array[:23, 29:52], disassembly[1, :23, :23])
+        close = np.allclose(array[:23, :23], disassembly[0, :23, :23])
+        self.assertTrue(close)
+        close = np.allclose(array[29:52, :23], disassembly[1, :23, :23])
         self.assertTrue(close)
 
     def test_four_quadrant_disassembly(self):

@@ -22,7 +22,8 @@ class Decomposition:
             return EigenDecomposition(variable)
         if variable.dimensions[-2:] == ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
             return SingularValueDecomposition(variable)
-        raise DecompositionException(f'Variable {variable.name} cannot be decomposed')
+        raise DecompositionException(
+            f'Variable {variable.name} cannot be decomposed')
 
     # TODO refactor: make methods signature more compact
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
@@ -55,11 +56,11 @@ class SingularValueDecomposition(Decomposition):
 
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
         q: Quadrant = Quadrant.for_assembly(var)
-        events, lower_bound, upper_bound = q.transformed_shape()
-        # tranformed shape 1: (e, gl, gl), 2: (e, gl, 2*gl), 4:(e, 2* gl, 2*gl)
-        all_U = np.ma.masked_all((events, lower_bound, lower_bound))
+        events, upper_bound, lower_bound = q.transformed_shape()
+        # tranformed shape 1: (e, gl, gl), 2: (e, 2*gl, gl), 4:(e, 2* gl, 2*gl)
+        all_U = np.ma.masked_all((events, upper_bound, lower_bound))
         all_s = np.ma.masked_all((events, lower_bound))
-        all_Vh = np.ma.masked_all((events, lower_bound, upper_bound))
+        all_Vh = np.ma.masked_all((events, lower_bound, lower_bound))
         for event in range(var.shape[0]):
             if np.ma.is_masked(levels[event]) or levels.data[event] > 29:
                 continue
@@ -84,13 +85,13 @@ class SingularValueDecomposition(Decomposition):
         upper_dim, lower_dim = q.upper_and_lower_dimension()
         # TODO add group description
         path = f'{group.path}/{var.name}/'
-        U_dim = ('event', lower_dim, lower_dim)
+        U_dim = ('event', upper_dim, lower_dim)
         U_out = output.createVariable(path + 'U', 'f', U_dim, zlib=True)
         U_out[:] = all_U[:]
         s_dim = ('event', lower_dim)
         s_out = output.createVariable(path + 's', 'f', s_dim, zlib=True)
         s_out[:] = all_s[:]
-        Vh_dim = ('event', lower_dim, upper_dim)
+        Vh_dim = ('event', lower_dim, lower_dim)
         Vh_out = output.createVariable(path + 'Vh', 'f', Vh_dim, zlib=True)
         Vh_out[:] = all_Vh[:]
 
