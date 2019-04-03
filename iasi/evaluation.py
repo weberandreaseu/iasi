@@ -64,6 +64,7 @@ class EvaluationCompressionSize(EvaluationTask):
         df = pd.DataFrame()
         for task, input in zip(self.requires()['single'], self.input()['single']):
             df = df.append({
+                'gas': task.gas,
                 'variable': task.variable,
                 'ancestor': task.ancestor,
                 'size': self.size_in_kb(input.path),
@@ -171,7 +172,8 @@ class ErrorEstimation:
 
         switcher = {
             'avk': self.averaging_kernel,
-            'n': self.noise_matrix
+            'n': self.noise_matrix,
+            'Tatmxavk': self.cross_averaging_kernel
         }
         error_estimation_method = switcher.get(variable.name)
         if error_estimation_method is None:

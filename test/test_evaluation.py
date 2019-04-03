@@ -13,8 +13,8 @@ class TestEvaluation(unittest.TestCase):
             # file='data/input/MOTIV-slice-1000.nc',
             dst='/tmp/iasi',
             force=True,
-            gases=['WV'],
-            variables=['avk']
+            gases=['WV', 'GHG', 'HNO3'],
+            variables=['avk', 'n', 'Tatmxavk']
         )
         assert luigi.build([task], local_scheduler=True)
 
