@@ -32,8 +32,10 @@ def plot_size_for(gas: str, variable: str):
     ax = gas_compressed.plot.bar(x='threshold', y='size', rot=0, legend=False)
     gas_original = filter_by(original, gas, variable)
     assert len(gas_original) == 1
-    ax.axhline(gas_original['size'].values[0], color='red', label='Error')
-
+    original_size = gas_original['size'].values[0]
+    ax.axhline(original_size, color='red')
+    ax.text(0, original_size * 0.94, 'Original size',
+            horizontalalignment='center')
     # ax.legend(loc='upper left')
     ax.set_ylabel('File size in kB')
     ax.set_xlabel('Threshold for eigenvalue selection')
@@ -57,6 +59,8 @@ ax = wv.groupby('threshold').sum()['size'].plot.bar(rot=0)
 ax.set_ylabel('Size in kB')
 ax.set_xlabel('Threshold for eigenvalue selection')
 gas_original_sum = original[original['gas'] == 'WV']['size'].sum()
-ax.axhline(gas_original_sum, color='red', label='Error')
+ax.axhline(gas_original_sum, color='red')
+ax.text(0, gas_original_sum * 0.94, 'Original size',
+        horizontalalignment='center')
 plt.title('Total size for WV')
 plt.show()
