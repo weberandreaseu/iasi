@@ -1,12 +1,17 @@
-import unittest
-import numpy as np
-from iasi import Composition, CompressDataset, MoveVariables, DecompressDataset
-from iasi.util import child_variables_of, child_groups_of
-from netCDF4 import Dataset, Group, Variable
-import luigi
-from typing import Set
+import logging
 import os
+import unittest
+from typing import Set
 
+import luigi
+import numpy as np
+from netCDF4 import Dataset, Group, Variable
+
+from iasi import Composition, CompressDataset, DecompressDataset, MoveVariables
+from iasi.util import child_groups_of, child_variables_of
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class TestCompareDecompressionResult(unittest.TestCase):
     @classmethod
@@ -47,7 +52,7 @@ class TestCompareDecompressionResult(unittest.TestCase):
             self.assertSetEqual(set(group.variables.keys()), other_vars)
 
     def test_all_variable_values_are_close(self):
-        for group, var in child_variables_of(self.uncompressed):
+        for group, var in child_variables_of(self.uncompressed['state']):
             path = os.path.join(group.path, var.name)
             original = var[...]
             reconstructed = self.compressed[path][...]
@@ -55,3 +60,4 @@ class TestCompareDecompressionResult(unittest.TestCase):
             self.assertTrue(same_mask, 'reconstruced mask is not equal')
             close = np.ma.allclose(original, reconstructed, atol=1e-3)
             self.assertTrue(close, f'reconstruction values are not close for {path}')
+            logger.debug('All variables are close for %s', path)
