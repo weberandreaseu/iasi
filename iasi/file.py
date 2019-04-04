@@ -35,7 +35,6 @@ class CopyNetcdfFile(CustomTask):
         'cld_tp'                      :'/cld/tp',
         'cld_ph'                      :'/cld/ph',
         'cld_tt'                      :'/cld/tt',
-        # TODO typo?
         'flg_cdlfrm'                  :'/flg/cldfrm',
         'flg_cldnes'                  :'/flg/cldnes',
         'flg_dustcld'                 :'/flg/dustcld',
@@ -45,11 +44,10 @@ class CopyNetcdfFile(CustomTask):
         'flg_numit'                   :'/flg/numit',
         'flg_resid'                   :'/flg/resid',
         'flg_retcheck'                :'/flg/retcheck',
-        # TODO is this desired?
         'srf_flag'                    :'/flg/srf',
-        'sfc_emi'                     :'/sfc/emi',
-        'sfc_emi_wn'                  :'/sfc/emi_wn',
-        'sfc_emi_flag'                :'/sfc/emi_flag',
+        'sfc_emi'                     :'/emi/emi',
+        'sfc_emi_wn'                  :'/emi/wn',
+        'sfc_emi_flag'                :'/emi/flag',
         'state_GHGatm'                :'/state/GHG/r',
         'state_GHGatm_a'              :'/state/GHG/a',
         'state_GHGatm_avk'            :'/state/GHG/avk',
