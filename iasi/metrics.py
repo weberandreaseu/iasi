@@ -15,7 +15,7 @@ class Covariance:
         """
         return np.exp(-((x - mu)*(x - mu))/(2 * sig * sig))
 
-    def traf(self):
+    def traf(self) -> np.ndarray:
         """P (see equation 6)
 
         Used to transform {ln[H2O], ln[HDO]} state
@@ -25,7 +25,7 @@ class Covariance:
         return np.block([[np.identity(self.nol)*0.5, np.identity(self.nol)*0.5],
                          [-np.identity(self.nol), np.identity(self.nol)]])
 
-    def type1_covariance(self):
+    def type1_covariance(self) -> np.ndarray:
         """Sa' (see equation 7)
 
         A priori covariance of {(ln[H2O]+ln[HDO])/2 and ln[HDO]-ln[H2O]} state
@@ -44,7 +44,7 @@ class Covariance:
                     self.gaussian(self.alt[i], self.alt[j], 2500)
         return result
 
-    def apriori_covariance(self):
+    def apriori_covariance(self) -> np.ndarray:
         """Sa (see equation 5)
 
         A priori Covariance of {ln[H2O], ln[HDO]} state
@@ -56,7 +56,7 @@ class Covariance:
         P = self.traf()
         return np.linalg.inv(P) @ self.apriori_covariance_traf() @ np.linalg.inv(P.T)
 
-    def type1_of(self, matrix):
+    def type1_of(self, matrix) -> np.ndarray:
         """A' (see equation 10)
 
         Return tranformed martix
@@ -64,17 +64,20 @@ class Covariance:
         P = self.traf()
         return P @ matrix @ np.linalg.inv(P)
 
-    def type2_of(self, matrix):
+    def c_by_type1(self, A_) -> np.ndarray:
+        return np.block([[A_[self.nol:, self.nol:], np.zeros((self.nol, self.nol))],
+                         [-A_[self.nol:, :self.nol], np.identity(self.nol)]])
+
+    def type2_of(self, matrix) -> np.ndarray:
         """A'' (see equation 15)
 
         A posteriori transformed matrix 
         """
         A_ = self.type1_of(matrix)
-        C = np.block([[A_[self.nol:, self.nol:], np.zeros((self.nol, self.nol))],
-                      [-A_[self.nol:, :self.nol], np.identity(self.nol)]])
+        C = self.c_by_type1(A_)
         return C @ A_
 
-    def smoothing_error_covariance(self, actual_matrix, to_compare):
+    def smoothing_error_covariance(self, actual_matrix, to_compare) -> np.ndarray:
         """S's (see equation 11)
         """
         return (actual_matrix - to_compare) @ self.type1_covariance() @ (actual_matrix - to_compare).T

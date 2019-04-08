@@ -13,6 +13,9 @@ from iasi.file import MoveVariables
 from iasi.metrics import Covariance
 from iasi.quadrant import Quadrant
 from iasi.util import CustomTask
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class EvaluationTask(luigi.Config, CustomTask):
@@ -255,6 +258,34 @@ class WaterVapour(ErrorEstimation):
             err = err_original - cov_event.type1_of(approx_event)
         else:
             err = err_original
+        for loi in self.levels_of_interest:
+            level = level_event + loi
+            if level < 2:
+                continue
+            result['event'].append(event)
+            result['level_of_interest'].append(loi)
+            result['err'].append(err[level, level])
+            result['rc_error'].append(rc_error)
+            result['type'].append(1)
+
+    def cross_averaging_kernel(self, event, level_event, original_event, approx_event, rc_error, result):
+        cov_event = Covariance(level_event, self.alt[event])
+        # original_type1 = cov_event.type1_of(original_event)
+        P = cov_event.traf()
+        if original_event.mask:
+            logger.warn('Kernel contains masked values')
+        original_type1 = P @ original_event.data
+        s_cov = cov_event.type1_covariance()[:level_event, :level_event]
+
+        if rc_error:
+            if approx_event.mask:
+                logger.warn('Reconstructed kernel contains masked values')
+            approx_type1 = P @ approx_event.data
+            I = approx_type1
+        else:
+            # what is the ideal cross averaging kernel?
+            I = np.identity(level_event * 2)[:, :level_event]
+        err = (original_type1 - I) @ s_cov @ (original_type1 - I).T
         for loi in self.levels_of_interest:
             level = level_event + loi
             if level < 2:

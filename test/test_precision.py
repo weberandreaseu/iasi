@@ -60,7 +60,7 @@ class TestCompareDecompressionResult(unittest.TestCase):
             original = var[...]
             reconstructed = self.compressed[path][...]
             same_mask = np.equal(original.mask, reconstructed.mask).all()
-            self.assertTrue(same_mask, 'reconstruced mask is not equal')
+            self.assertTrue(same_mask, f'reconstruced mask is not equal for {path}')
             close = np.ma.allclose(original, reconstructed, atol=1e-3)
             self.assertTrue(close, f'reconstruction values are not close for {path}')
             logger.debug('All variables are close for %s', path)

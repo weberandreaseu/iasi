@@ -38,7 +38,7 @@ class TestEvaluation(unittest.TestCase):
             dst='/tmp/iasi',
             force_upstream=True,
             gases=['WV'],
-            variables=['avk', 'n']
+            variables=['avk', 'n', 'Tatmxavk']
         )
         assert luigi.build([task], local_scheduler=True)
         df = pd.read_csv(task.output()['WV'].path)
