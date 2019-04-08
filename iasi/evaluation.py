@@ -161,10 +161,8 @@ class ErrorEstimation:
         self.nol = nol
         self.alt = alt
 
-    def report_for(self, variable: Variable, original, approximated, rc_error) -> pd.DataFrame:
-        assert original.shape == approximated.shape
-        # columns:
-        # var | event | type (l1/l2) | err | diff | eps
+    def report_for(self, variable: Variable, original, reconstructed, rc_error) -> pd.DataFrame:
+        assert original.shape == reconstructed.shape
         result = {
             'event': [],
             'level_of_interest': [],
@@ -172,14 +170,13 @@ class ErrorEstimation:
             'rc_error': [],
             'type': []
         }
-
-        switcher = {
+        error_estimation_methods = {
             'avk': self.averaging_kernel,
             'n': self.noise_matrix,
             'Tatmxavk': self.cross_averaging_kernel
         }
-        error_estimation_method = switcher.get(variable.name)
-        if error_estimation_method is None:
+        estimation_method = error_estimation_methods.get(variable.name)
+        if estimation_method is None:
             raise ValueError(
                 f'No error estimation method for variable {variable.name}')
 
@@ -188,12 +185,47 @@ class ErrorEstimation:
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
             nol_event = self.nol.data[event]
+            covariance = Covariance(nol_event, self.alt[event])
             original_event = reshaper.transform(original[event], nol_event)
-            approx_event = reshaper.transform(approximated[event], nol_event)
-            error_estimation_method(
-                event, nol_event, original_event, approx_event, rc_error, result)
-            # read original akv and avk_rc
+            if original_event.mask.any():
+                logger.warn('Original array contains masked values')
+            # use reconstruced values iff rc_error flag is set
+            if rc_error:
+                rc_event = reshaper.transform(reconstructed[event], nol_event)
+                if rc_event.mask.any():
+                    logger.warn('Reconstructed array contains masked values')
+                rc_event = rc_event.data
+            else:
+                rc_event = None
+
+            # type two error only exists for water vapour
+            # if gas does not require type 2 error estimation, break loop after first iteration
+            calc_type_two = self.type_two
+            while True:
+                error = estimation_method(
+                    original_event.data, rc_event, covariance, type2=calc_type_two)
+                self.add_error_to_report(
+                    result, nol_event, event, error, rc_error, type_two=calc_type_two)
+                # stop if type 1 is calculated
+                if not calc_type_two:
+                    break
+                # just finished type 2 in first iteration -> repeat with type 1
+                calc_type_two = False
         return pd.DataFrame(result)
+
+    def add_error_to_report(self, result, nol, event, error, rc_error, type_two=False):
+        for loi in self.levels_of_interest:
+            level = nol + loi
+            if level < 2:
+                continue
+            result['event'].append(event)
+            result['level_of_interest'].append(loi)
+            result['err'].append(error[level, level])
+            result['rc_error'].append(rc_error)
+            if type_two:
+                result['type'].append(2)
+            else:
+                result['type'].append(1)
 
     def averaging_kernel(self):
         raise NotImplementedError
@@ -209,92 +241,52 @@ class WaterVapour(ErrorEstimation):
     levels_of_interest = [-16, -20]
     # for each method type one and type two
 
-    def averaging_kernel(self, event, level_event, original_event, approx_event, rc_error, result) -> None:
-        for type in range(1, 3):
-            if type == 1:
-                e_err = self.type1_error(
-                    event, level_event, original_event, approx_event, rc_error)
-            elif type == 2:
-                e_err = self.type2_error(
-                    event, level_event, original_event, approx_event, rc_error)
+    def averaging_kernel(self, original, reconstructed, covariance, type2=False) -> np.ndarray:
+        rc_error = reconstructed is not None
+        if type2:
+            # type 2 error
+            original_type2 = covariance.type2_of(original)
+            if reconstructed is None:
+                # type 2 original error
+                return covariance.smoothing_error_covariance(original_type2, np.identity(2 * covariance.nol))
             else:
-                continue
-            for loi in self.levels_of_interest:
-                level = level_event + loi
-                if level < 2:
-                    continue
-                result['event'].append(event)
-                result['level_of_interest'].append(loi)
-                result['err'].append(e_err[level, level])
-                result['rc_error'].append(rc_error)
-                result['type'].append(type)
-
-    def type1_error(self, event, level_event, original_event, approx_event, rc_error):
-        e_cov = Covariance(level_event, self.alt[event])
-        original_type1 = e_cov.type1_of(original_event)
-        if rc_error:
-            approx_type1 = e_cov.type1_of(approx_event)
-            e_err = e_cov.smoothing_error_covariance(
-                original_type1, approx_type1)
+                # type 2 reconstruction error
+                rc_type2 = covariance.type2_of(reconstructed)
+                return covariance.smoothing_error_covariance(original_type2, rc_type2)
         else:
-            e_err = e_cov.smoothing_error_covariance(
-                original_type1, np.identity(2 * level_event))
-        return e_err
+            # type 1 error
+            original_type1 = covariance.type1_of(original)
+            if reconstructed is None:
+                # type 1 original error
+                return covariance.smoothing_error_covariance(
+                    original_type1, np.identity(2 * covariance.nol))
+            else:
+                # type 1 reconstruction error
+                rc_type1 = covariance.type1_of(reconstructed)
+                return covariance.smoothing_error_covariance(original_type1, rc_type1)
 
-    def type2_error(self, event, level_event, original_event, approx_event, rc_error):
-        e_cov = Covariance(level_event, self.alt[event])
-        original_type2 = e_cov.type2_of(original_event)
-        if rc_error:
-            approx_type2 = e_cov.type2_of(approx_event)
-            return e_cov.smoothing_error_covariance(original_type2, approx_type2)
-        else:
-            return e_cov.smoothing_error_covariance(original_type2, np.identity(2 * level_event))
-
-    def noise_matrix(self, event, level_event, original_event, approx_event, rc_error, result):
-        cov_event = Covariance(level_event, self.alt[event])
+    def noise_matrix(self, original_event, approx_event, covariance, type2=False) -> np.ndarray:
         # original/approx event is already covariance matrix -> only type1/2 transformation
-        err_original = cov_event.type1_of(original_event)
-        if rc_error:
-            err = err_original - cov_event.type1_of(approx_event)
+        err_original = covariance.type1_of(original_event)
+        if approx_event is None:
+            return err_original
         else:
-            err = err_original
-        for loi in self.levels_of_interest:
-            level = level_event + loi
-            if level < 2:
-                continue
-            result['event'].append(event)
-            result['level_of_interest'].append(loi)
-            result['err'].append(err[level, level])
-            result['rc_error'].append(rc_error)
-            result['type'].append(1)
+            return err_original - covariance.type1_of(approx_event)
 
-    def cross_averaging_kernel(self, event, level_event, original_event, approx_event, rc_error, result):
-        cov_event = Covariance(level_event, self.alt[event])
-        # original_type1 = cov_event.type1_of(original_event)
-        P = cov_event.traf()
-        if original_event.mask:
-            logger.warn('Kernel contains masked values')
+    def cross_averaging_kernel(self, original_event, approx_event, covariance, type2=False) -> np.ndarray:
+        # original_type1 = covariance.type1_of(original_event)
+        P = covariance.traf()
         original_type1 = P @ original_event.data
-        s_cov = cov_event.type1_covariance()[:level_event, :level_event]
+        s_cov = covariance.type1_covariance()[:covariance.nol, :covariance.nol]
 
-        if rc_error:
-            if approx_event.mask:
-                logger.warn('Reconstructed kernel contains masked values')
-            approx_type1 = P @ approx_event.data
-            I = approx_type1
+        if approx_event is None:
+            # TODO: what is the ideal cross averaging kernel?
+            # original error
+            I = np.identity(covariance.nol * 2)[:, :covariance.nol]
         else:
-            # what is the ideal cross averaging kernel?
-            I = np.identity(level_event * 2)[:, :level_event]
-        err = (original_type1 - I) @ s_cov @ (original_type1 - I).T
-        for loi in self.levels_of_interest:
-            level = level_event + loi
-            if level < 2:
-                continue
-            result['event'].append(event)
-            result['level_of_interest'].append(loi)
-            result['err'].append(err[level, level])
-            result['rc_error'].append(rc_error)
-            result['type'].append(1)
+            # reconstruction error
+            I = P @ approx_event.data
+        return (original_type1 - I) @ s_cov @ (original_type1 - I).T
 
 
 class GreenhouseGas(ErrorEstimation):

@@ -1,6 +1,5 @@
 # %% [markdown]
 # # Error Estimation
-
 # %%
 import matplotlib
 import luigi
@@ -16,7 +15,7 @@ task = EvaluationErrorEstimation(
     file='data/input/MOTIV-slice-100.nc',
     # file='test/resources/MOTIV-single-event.nc',
     gases=['WV'],
-    variables=['avk', 'n']
+    variables=['avk', 'n', 'Tatmxavk']
 )
 
 assert luigi.build([task], local_scheduler=True)
@@ -57,6 +56,10 @@ plot_error_estimation_for('WV', 'avk', -16)
 # ### Noise Matrix
 # - Level of interest: -16
 plot_error_estimation_for('WV', 'n', -16)
+# %%[markdown]
+# ### Crosse averaging temperature in atmosphere
+# - Level of interest: -16
+plot_error_estimation_for('WV', 'Tatmxavk', -16)
 
 # %%
 df[
