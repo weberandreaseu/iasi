@@ -331,3 +331,34 @@ class GreenhouseGas(ErrorEstimation):
 
 class NitridAcid(ErrorEstimation):
     levels_of_interest = [-6]
+
+    # TODO validate
+    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+        assert not type2
+        if reconstructed is None:
+            # original error
+            to_compare = np.identity(covariance.nol)
+        else:
+            # reconstruction error
+            to_compare = reconstructed
+        s_cov = covariance.type1_covariance()[:covariance.nol, :covariance.nol]
+        return (original - to_compare) @ s_cov @ (original - to_compare).T
+
+    # TODO validate
+    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+        s_cov = covariance.type1_covariance()[:covariance.nol, :covariance.nol]
+        if reconstructed is None:
+            # TODO: what is the ideal cross averaging kernel?
+            # original error
+            to_compare = np.identity(covariance.nol)
+        else:
+            # reconstruction error
+            to_compare = reconstructed
+        return (original - to_compare) @ s_cov @ (original - to_compare).T
+
+    # TODO validate
+    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+        if reconstructed is None:
+            return original
+        else:
+            return original - reconstructed

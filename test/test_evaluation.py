@@ -38,13 +38,13 @@ class TestEvaluation(unittest.TestCase):
             # file='data/input/MOTIV-slice-1000.nc',
             dst='/tmp/iasi',
             force_upstream=True,
-            gases=['WV', 'GHG'],
+            gases=['WV', 'GHG', 'HNO3'],
             variables=['avk', 'n', 'Tatmxavk']
-            # variables=['avk']
         )
         assert luigi.build([task], local_scheduler=True)
         cls.wv = pd.read_csv(task.output()['WV'].path)
         cls.ghg = pd.read_csv(task.output()['GHG'].path)
+        cls.hno3 = pd.read_csv(task.output()['HNO3'].path)
 
     def verify_water_vapour(self):
         ##### type 1 error #####
@@ -98,3 +98,6 @@ class TestEvaluation(unittest.TestCase):
 
     def verify_greenhouse_gases(self, ghg: pd.DataFrame):
         self.assertGreater(len(self.ghg), 0)
+
+    def verify_nitrid_acid(self, ghg: pd.DataFrame):
+        self.assertGreater(len(self.hno3), 0)

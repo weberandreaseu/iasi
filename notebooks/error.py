@@ -12,9 +12,9 @@ from iasi.evaluation import EvaluationErrorEstimation
 task = EvaluationErrorEstimation(
     force_upstream=True,
     dst='data',
-    # file='data/input/MOTIV-slice-100.nc',
-    file='test/resources/MOTIV-single-event.nc',
-    gases=['WV', 'GHG'],
+    file='data/input/MOTIV-slice-100.nc',
+    # file='test/resources/MOTIV-single-event.nc',
+    gases=['WV', 'GHG', 'HNO3'],
     variables=['avk', 'n', 'Tatmxavk']
     # variables=['avk']
 )
@@ -25,6 +25,7 @@ types = {'event': np.int, 'level_of_interest': np.int, 'err': np.float,
          type: np.int, 'rc_error': bool, 'threshold': np.float, 'var': str}
 wv = pd.read_csv(task.output()['WV'].path, dtype=types)
 ghg = pd.read_csv(task.output()['GHG'].path, dtype=types)
+nho3 = pd.read_csv(task.output()['HNO3'].path, dtype=types)
 
 
 def filter_by(df: pd.DataFrame, var: str, level_of_interest: int, rc_error=True):
@@ -78,3 +79,12 @@ plot_error_estimation_for(ghg, 'GHG', 'avk', -10)
 plot_error_estimation_for(ghg, 'GHG', 'Tatmxavk', -10)
 # %%
 plot_error_estimation_for(ghg, 'GHG', 'n', -10)
+
+# %% [markdown]
+# # Nitrid Acid
+
+plot_error_estimation_for(nho3, 'NHO3', 'avk', -6)
+# %%
+plot_error_estimation_for(nho3, 'NHO3', 'Tatmxavk', -6)
+# %%
+plot_error_estimation_for(nho3, 'NHO3', 'n', -6)
