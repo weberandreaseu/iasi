@@ -109,8 +109,8 @@ class EvaluationErrorEstimation(EvaluationTask):
         }
 
     def run(self):
-        tasks_and_input = zip(
-            self.requires()['single'], self.input()['single'])
+        tasks_and_input = list(zip(
+            self.requires()['single'], self.input()['single']))
         original = Dataset(self.input()['original'].path)
         nol = original['atm_nol'][...]
         alt = original['atm_altitude'][...]
@@ -227,13 +227,13 @@ class ErrorEstimation:
             else:
                 result['type'].append(1)
 
-    def averaging_kernel(self):
+    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
         raise NotImplementedError
 
-    def noise_matrix(self):
+    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
         raise NotImplementedError
 
-    def cross_averaging_kernel(self):
+    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
         raise NotImplementedError
 
 
@@ -241,29 +241,29 @@ class WaterVapour(ErrorEstimation):
     levels_of_interest = [-16, -20]
     # for each method type one and type two
 
-    def averaging_kernel(self, original, reconstructed, covariance, type2=False) -> np.ndarray:
+    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
         rc_error = reconstructed is not None
         if type2:
             # type 2 error
             original_type2 = covariance.type2_of(original)
             if reconstructed is None:
                 # type 2 original error
-                return covariance.smoothing_error_covariance(original_type2, np.identity(2 * covariance.nol))
+                return covariance.smoothing_error(original_type2, np.identity(2 * covariance.nol))
             else:
                 # type 2 reconstruction error
                 rc_type2 = covariance.type2_of(reconstructed)
-                return covariance.smoothing_error_covariance(original_type2, rc_type2)
+                return covariance.smoothing_error(original_type2, rc_type2)
         else:
             # type 1 error
             original_type1 = covariance.type1_of(original)
             if reconstructed is None:
                 # type 1 original error
-                return covariance.smoothing_error_covariance(
+                return covariance.smoothing_error(
                     original_type1, np.identity(2 * covariance.nol))
             else:
                 # type 1 reconstruction error
                 rc_type1 = covariance.type1_of(reconstructed)
-                return covariance.smoothing_error_covariance(original_type1, rc_type1)
+                return covariance.smoothing_error(original_type1, rc_type1)
 
     def noise_matrix(self, original_event, approx_event, covariance, type2=False) -> np.ndarray:
         # original/approx event is already covariance matrix -> only type1/2 transformation
@@ -282,15 +282,51 @@ class WaterVapour(ErrorEstimation):
         if approx_event is None:
             # TODO: what is the ideal cross averaging kernel?
             # original error
-            I = np.identity(covariance.nol * 2)[:, :covariance.nol]
+            to_compare = np.identity(covariance.nol * 2)[:, :covariance.nol]
         else:
             # reconstruction error
-            I = P @ approx_event.data
-        return (original_type1 - I) @ s_cov @ (original_type1 - I).T
+            to_compare = P @ approx_event.data
+        return (original_type1 - to_compare) @ s_cov @ (original_type1 - to_compare).T
 
 
 class GreenhouseGas(ErrorEstimation):
     levels_of_interest = [-10, -19]
+
+    # TODO validate
+    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+        assert not type2
+        original_type1 = covariance.type1_of(original)
+        if reconstructed is None:
+            # original error
+            identity = np.identity(covariance.nol * 2)
+            return covariance.smoothing_error(original_type1, identity)
+        else:
+            # reconstruction error
+            rc_type1 = covariance.type1_of(reconstructed)
+            return covariance.smoothing_error(original_type1, rc_type1)
+
+    # TODO validate
+    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+        P = covariance.traf()
+        original_type1 = P @ original
+        s_cov = covariance.type1_covariance()[:covariance.nol, :covariance.nol]
+
+        if reconstructed is None:
+            # TODO: what is the ideal cross averaging kernel?
+            # original error
+            to_compare = np.identity(covariance.nol * 2)[:, :covariance.nol]
+        else:
+            # reconstruction error
+            to_compare = P @ reconstructed.data
+        return (original_type1 - to_compare) @ s_cov @ (original_type1 - to_compare).T
+
+    # TODO validate
+    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+        original_type1 = covariance.type1_of(original)
+        if reconstructed is None:
+            return original_type1
+        else:
+            return original_type1 - covariance.type1_of(reconstructed)
 
 
 class NitridAcid(ErrorEstimation):

@@ -40,9 +40,11 @@ class TestEvaluation(unittest.TestCase):
             force_upstream=True,
             gases=['WV', 'GHG'],
             variables=['avk', 'n', 'Tatmxavk']
+            # variables=['avk']
         )
         assert luigi.build([task], local_scheduler=True)
         cls.wv = pd.read_csv(task.output()['WV'].path)
+        cls.ghg = pd.read_csv(task.output()['GHG'].path)
 
     def verify_water_vapour(self):
         ##### type 1 error #####
@@ -95,4 +97,4 @@ class TestEvaluation(unittest.TestCase):
         )
 
     def verify_greenhouse_gases(self, ghg: pd.DataFrame):
-        pass
+        self.assertGreater(len(self.ghg), 0)

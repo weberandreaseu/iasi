@@ -77,7 +77,7 @@ class Covariance:
         C = self.c_by_type1(A_)
         return C @ A_
 
-    def smoothing_error_covariance(self, actual_matrix, to_compare) -> np.ndarray:
+    def smoothing_error(self, actual_matrix, to_compare) -> np.ndarray:
         """S's (see equation 11)
         """
         return (actual_matrix - to_compare) @ self.type1_covariance() @ (actual_matrix - to_compare).T
