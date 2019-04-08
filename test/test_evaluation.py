@@ -31,24 +31,26 @@ class TestEvaluation(unittest.TestCase):
         assert len(filtered) > 0
         return filtered
 
-    def test_error_estimation(self):
+    @classmethod
+    def setUpClass(cls):
         task = EvaluationErrorEstimation(
             file='test/resources/MOTIV-single-event.nc',
             # file='data/input/MOTIV-slice-1000.nc',
             dst='/tmp/iasi',
             force_upstream=True,
-            gases=['WV'],
+            gases=['WV', 'GHG'],
             variables=['avk', 'n', 'Tatmxavk']
         )
         assert luigi.build([task], local_scheduler=True)
-        df = pd.read_csv(task.output()['WV'].path)
+        cls.wv = pd.read_csv(task.output()['WV'].path)
 
+    def verify_water_vapour(self):
         ##### type 1 error #####
 
         # water vapour: level 16
         # error
         err_wv_avk_type1 = self.filter_by(
-            df, 'avk', -16, rc_error=False
+            self.wv, 'avk', -16, rc_error=False
         )
         self.assertEqual(len(err_wv_avk_type1), 1,
                          'More results than expected')
@@ -60,7 +62,7 @@ class TestEvaluation(unittest.TestCase):
 
         # reconstruction error
         rc_err_wv_avk_type1 = self.filter_by(
-            df, 'avk', -16, rc_error=True, threshold=0.001
+            self.wv, 'avk', -16, rc_error=True, threshold=0.001
         )
         self.assertEqual(len(rc_err_wv_avk_type1), 1,
                          'More results than expected')
@@ -72,12 +74,12 @@ class TestEvaluation(unittest.TestCase):
 
         ##### type 2 error #####
         err_wv_avk_type2 = self.filter_by(
-            df, 'avk', -16, rc_error=False, type=2
+            self.wv, 'avk', -16, rc_error=False, type=2
         )
         self.assertEqual(len(err_wv_avk_type2), 1,
                          'More results than expected')
         rc_err_wv_avk_type2 = self.filter_by(
-            df, 'avk', -16, rc_error=True, type=2, threshold=0.001
+            self.wv, 'avk', -16, rc_error=True, type=2, threshold=0.001
         )
         self.assertEqual(len(rc_err_wv_avk_type2), 1,
                          'More results than expected')
@@ -91,3 +93,6 @@ class TestEvaluation(unittest.TestCase):
             err_wv_avk_type2.err.values[0],
             'Type 1 error should be smaller than type 2 error'
         )
+
+    def verify_greenhouse_gases(self, ghg: pd.DataFrame):
+        pass
