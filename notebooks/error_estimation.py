@@ -16,7 +16,6 @@ task = EvaluationErrorEstimation(
     # file='test/resources/MOTIV-single-event.nc',
     gases=['WV', 'GHG', 'HNO3', 'Tatm'],
     variables=['avk', 'n', 'Tatmxavk']
-    # variables=['avk']
 )
 
 assert luigi.build([task], local_scheduler=True)

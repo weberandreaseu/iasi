@@ -18,68 +18,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class EvaluationTask(luigi.Config, CustomTask):
+class EvaluationTask(CustomTask):
     file = luigi.Parameter()
     gases = luigi.ListParameter()
     variables = luigi.ListParameter()
-
-
-class EvaluationCompressionSize(EvaluationTask):
+    ancestor = None
 
     def requires(self):
         compression_parameter = {
-            'ancestor': ['CompressDataset'],
-            'file': [self.file],
-            'dst': [self.dst],
-            'force': [self.force],
-            'force_upstream': [self.force_upstream],
-            'threshold': [1e-2, 1e-3, 1e-4, 1e-5],
-            'gas': self.gases,
-            'variable': self.variables
-        }
-        compressed_param_grid = list(ParameterGrid(compression_parameter))
-        tasks = [SelectSingleVariable(**params)
-                 for params in compressed_param_grid]
-        # for uncompressed dataset we do not need multiple threshold values
-        uncompressed_parameter = {
-            'ancestor': ['MoveVariables'],
-            'file': [self.file],
-            'dst': [self.dst],
-            'force': [self.force],
-            'threshold': [0],
-            'gas': self.gases,
-            'variable': self.variables
-        }
-        uncompressed_param_grid = list(ParameterGrid(uncompressed_parameter))
-        return {
-            'single': tasks + [SelectSingleVariable(**params) for params in uncompressed_param_grid],
-            'original': MoveVariables(dst=self.dst, file=self.file)
-        }
-
-    def output(self):
-        return self.create_local_target('compression-summary', file=self.file, ext='csv')
-
-    def size_in_kb(self, file):
-        return int(os.path.getsize(file) / (1000))
-
-    def run(self):
-        # get size for all parameters
-        df = pd.DataFrame()
-        for task, input in zip(self.requires()['single'], self.input()['single']):
-            df = df.append({
-                'gas': task.gas,
-                'variable': task.variable,
-                'ancestor': task.ancestor,
-                'size': self.size_in_kb(input.path),
-                'threshold': task.threshold
-            }, ignore_index=True)
-        df.to_csv(self.output().path, index=False)
-
-
-class EvaluationErrorEstimation(EvaluationTask):
-    def requires(self):
-        compression_parameter = {
-            'ancestor': ['DecompressDataset'],
+            'ancestor': [self.ancestor],
             'file': [self.file],
             'dst': [self.dst],
             'force': [self.force],
@@ -114,6 +61,33 @@ class EvaluationErrorEstimation(EvaluationTask):
             'single': filtered,
             'original': MoveVariables(dst=self.dst, file=self.file, force=self.force, force_upstream=self.force_upstream)
         }
+
+
+class EvaluationCompressionSize(EvaluationTask):
+    ancestor = 'CompressDataset'
+
+    def output(self):
+        return self.create_local_target('compression-summary', file=self.file, ext='csv')
+
+    def size_in_kb(self, file):
+        return int(os.path.getsize(file) / (1000))
+
+    def run(self):
+        # get size for all parameters
+        df = pd.DataFrame()
+        for task, input in zip(self.requires()['single'], self.input()['single']):
+            df = df.append({
+                'gas': task.gas,
+                'variable': task.variable,
+                'ancestor': task.ancestor,
+                'size': self.size_in_kb(input.path),
+                'threshold': task.threshold
+            }, ignore_index=True)
+        df.to_csv(self.output().path, index=False)
+
+
+class EvaluationErrorEstimation(EvaluationTask):
+    ancestor = 'DecompressDataset'
 
     def run(self):
         tasks_and_input = list(zip(
@@ -213,28 +187,21 @@ class ErrorEstimation:
             while True:
                 error = estimation_method(
                     original_event.data, rc_event, covariance, type2=calc_type_two)
-                self.add_error_to_report(
-                    result, nol_event, event, error, rc_error, type_two=calc_type_two)
+                for loi in self.levels_of_interest:
+                    level = nol_event + loi
+                    if level < 2:
+                        continue
+                    result['event'].append(event)
+                    result['level_of_interest'].append(loi)
+                    result['err'].append(error[level, level])
+                    result['rc_error'].append(rc_error)
+                    result['type'].append(2 if calc_type_two else 1)
                 # stop if type 1 is calculated
                 if not calc_type_two:
                     break
                 # just finished type 2 in first iteration -> repeat with type 1
                 calc_type_two = False
         return pd.DataFrame(result)
-
-    def add_error_to_report(self, result, nol, event, error, rc_error, type_two=False):
-        for loi in self.levels_of_interest:
-            level = nol + loi
-            if level < 2:
-                continue
-            result['event'].append(event)
-            result['level_of_interest'].append(loi)
-            result['err'].append(error[level, level])
-            result['rc_error'].append(rc_error)
-            if type_two:
-                result['type'].append(2)
-            else:
-                result['type'].append(1)
 
     def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
         raise NotImplementedError
@@ -274,28 +241,30 @@ class WaterVapour(ErrorEstimation):
                 rc_type1 = covariance.type1_of(reconstructed)
                 return covariance.smoothing_error(original_type1, rc_type1)
 
-    def noise_matrix(self, original_event, approx_event, covariance, type2=False) -> np.ndarray:
+    def noise_matrix(self, original, reconstruced, covariance, type2=False) -> np.ndarray:
         # original/approx event is already covariance matrix -> only type1/2 transformation
-        err_original = covariance.type1_of(original_event)
-        if approx_event is None:
-            return err_original
+        original_type1 = covariance.type1_of(original)
+        if reconstruced is None:
+            return original_type1
         else:
-            return err_original - covariance.type1_of(approx_event)
+            return original_type1 - covariance.type1_of(reconstruced)
 
-    def cross_averaging_kernel(self, original_event, approx_event, covariance, type2=False) -> np.ndarray:
-        # original_type1 = covariance.type1_of(original_event)
+    def cross_averaging_kernel(self, original, reconstruced, covariance, type2=False) -> np.ndarray:
+        # original_type1 = covariance.type1_of(original)
         P = covariance.traf()
-        original_type1 = P @ original_event.data
-        s_cov = covariance.type1_covariance()[:covariance.nol, :covariance.nol]
-
-        if approx_event is None:
-            # TODO: what is the ideal cross averaging kernel?
-            # original error
-            to_compare = np.identity(covariance.nol * 2)[:, :covariance.nol]
+        original_type1 = P @ original
+        # TODO: what is the ideal cross averaging kernel?
+        # original error
+        identity = np.block([
+            [np.identity(covariance.nol)],
+            [np.zeros(shape=(covariance.nol, covariance.nol))]
+        ])
+        if reconstruced is None:
+            rc_type1 = identity
         else:
             # reconstruction error
-            to_compare = P @ approx_event.data
-        return (original_type1 - to_compare) @ s_cov @ (original_type1 - to_compare).T
+            rc_type1 = P @ reconstruced
+        return covariance.smoothing_error(original_type1, rc_type1, species=1)
 
 
 class GreenhouseGas(ErrorEstimation):
@@ -304,38 +273,30 @@ class GreenhouseGas(ErrorEstimation):
     # TODO validate
     def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
         assert not type2
-        original_type1 = covariance.type1_of(original)
         if reconstructed is None:
             # original error
-            identity = np.identity(covariance.nol * 2)
-            return covariance.smoothing_error(original_type1, identity)
-        else:
-            # reconstruction error
-            rc_type1 = covariance.type1_of(reconstructed)
-            return covariance.smoothing_error(original_type1, rc_type1)
+            reconstructed = np.identity(covariance.nol * 2)
+        # TODO GHG correct weight in assumed covariance?
+        return covariance.smoothing_error(original, reconstructed, species=2, w2=1)
 
     # TODO validate
     def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
-        P = covariance.traf()
-        original_type1 = P @ original
-        s_cov = covariance.type1_covariance()[:covariance.nol, :covariance.nol]
-
+        assert not type2
         if reconstructed is None:
             # TODO: what is the ideal cross averaging kernel?
             # original error
-            to_compare = np.identity(covariance.nol * 2)[:, :covariance.nol]
-        else:
-            # reconstruction error
-            to_compare = P @ reconstructed.data
-        return (original_type1 - to_compare) @ s_cov @ (original_type1 - to_compare).T
+            reconstructed = np.block([
+                [np.identity(covariance.nol)],
+                [np.zeros(shape=(covariance.nol, covariance.nol))]
+            ])
+        return covariance.smoothing_error(original, reconstructed, species=1)
 
     # TODO validate
     def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
-        original_type1 = covariance.type1_of(original)
         if reconstructed is None:
-            return original_type1
+            return original
         else:
-            return original_type1 - covariance.type1_of(reconstructed)
+            return original - reconstructed
 
 
 class NitridAcid(ErrorEstimation):
@@ -346,24 +307,16 @@ class NitridAcid(ErrorEstimation):
         assert not type2
         if reconstructed is None:
             # original error
-            to_compare = np.identity(covariance.nol)
-        else:
-            # reconstruction error
-            to_compare = reconstructed
-        s_cov = covariance.type1_covariance()[:covariance.nol, :covariance.nol]
-        return (original - to_compare) @ s_cov @ (original - to_compare).T
+            reconstructed = np.identity(covariance.nol)
+        return covariance.smoothing_error(original, reconstructed, species=1)
 
     # TODO validate
     def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
-        s_cov = covariance.type1_covariance()[:covariance.nol, :covariance.nol]
         if reconstructed is None:
             # TODO: what is the ideal cross averaging kernel?
             # original error
-            to_compare = np.identity(covariance.nol)
-        else:
-            # reconstruction error
-            to_compare = reconstructed
-        return (original - to_compare) @ s_cov @ (original - to_compare).T
+            reconstructed = np.identity(covariance.nol)
+        return covariance.smoothing_error(original, reconstructed, species=1)
 
     # TODO validate
     def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
@@ -380,9 +333,8 @@ class AtmosphericTemperature(ErrorEstimation):
     def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
         assert not type2
         if reconstructed is None:
-            return original - np.identity(covariance.nol)
-        else:
-            return original - reconstructed
+            reconstructed = np.identity(covariance.nol)
+        return covariance.smoothing_error(original, reconstructed, species=1)
 
     def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
         assert not type2

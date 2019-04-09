@@ -25,23 +25,33 @@ class Covariance:
         return np.block([[np.identity(self.nol)*0.5, np.identity(self.nol)*0.5],
                          [-np.identity(self.nol), np.identity(self.nol)]])
 
-    def type1_covariance(self) -> np.ndarray:
+    def assumed_covariance(self, species = 2, w1=1.0, w2=0.01, correlation_length=2500) -> np.ndarray:
         """Sa' (see equation 7)
 
         A priori covariance of {(ln[H2O]+ln[HDO])/2 and ln[HDO]-ln[H2O]} state
         Sa See equation 5 in paper
+
+        :param species              Number of atmospheric species (1 or 2)
+        :param w1:                  Weight for upper left quadrant
+        :param w2:                  Weight for lower right quadrant (ignored with 1 species)
+        :param correlation_length:  Assumed correlation of atmospheric levels in meter
         """
-        result = np.zeros((2 * self.nol, 2 * self.nol))
+        # only 1 or 2 species are allowed
+        assert (species >= 1) and (species <= 2)
+        result = np.zeros((species * self.nol, species * self.nol))
         for i in range(self.nol):
             for j in range(self.nol):
                 # 2500 = correlation length
                 # 100% for
                 # (ln[H2O]+ln[HDO])/2 state
-                result[i, j] = self.gaussian(self.alt[i], self.alt[j], 2500)
-                # 10% for (0.01 covariance)
-                # ln[HDO]-ln[H2O] state
-                result[i + self.nol, j + self.nol] = 0.01 * \
-                    self.gaussian(self.alt[i], self.alt[j], 2500)
+                result[i, j] = w1 * \
+                    self.gaussian(self.alt[i], self.alt[j], correlation_length)
+                if species == 2:
+                    # 10% for (0.01 covariance)
+                    # ln[HDO]-ln[H2O] state
+                    result[i + self.nol, j + self.nol] = w2 * \
+                        self.gaussian(
+                            self.alt[i], self.alt[j], correlation_length)
         return result
 
     def apriori_covariance(self) -> np.ndarray:
@@ -77,7 +87,7 @@ class Covariance:
         C = self.c_by_type1(A_)
         return C @ A_
 
-    def smoothing_error(self, actual_matrix, to_compare) -> np.ndarray:
+    def smoothing_error(self, actual_matrix, to_compare, **kwargs) -> np.ndarray:
         """S's (see equation 11)
         """
-        return (actual_matrix - to_compare) @ self.type1_covariance() @ (actual_matrix - to_compare).T
+        return (actual_matrix - to_compare) @ self.assumed_covariance(**kwargs) @ (actual_matrix - to_compare).T

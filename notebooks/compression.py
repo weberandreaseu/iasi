@@ -8,11 +8,11 @@ import pandas as pd
 from iasi.evaluation import EvaluationCompressionSize
 
 task = EvaluationCompressionSize(
-    force=True,
+    force_upstream=True,
     dst='data',
     file='data/input/MOTIV-slice-1000.nc',
     # file='test/resources/MOTIV-single-event.nc',
-    gases=['WV'],
+    gases=['WV', 'GHG', 'HNO3', 'Tatm'],
     variables=['avk', 'n', 'Tatmxavk']
 )
 
@@ -51,6 +51,22 @@ plot_size_for('WV', 'n')
 
 # %%
 plot_size_for('WV', 'Tatmxavk')
+# %%
+plot_size_for('GHG', 'avk')
+# %%
+plot_size_for('GHG', 'n')
+# %%
+plot_size_for('GHG', 'Tatmxavk')
+# %%
+plot_size_for('HNO3', 'avk')
+# %%
+plot_size_for('HNO3', 'n')
+# %%
+plot_size_for('HNO3', 'Tatmxavk')
+# %%
+plot_size_for('Tatm', 'avk')
+# %%
+plot_size_for('Tatm', 'n')
 
 # %%
 # Total size
