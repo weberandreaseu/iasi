@@ -10,11 +10,11 @@ import pandas as pd
 from iasi.evaluation import EvaluationErrorEstimation
 
 task = EvaluationErrorEstimation(
-    force_upstream=True,
+    # force_upstream=True,
     dst='data',
     file='data/input/MOTIV-slice-100.nc',
     # file='test/resources/MOTIV-single-event.nc',
-    gases=['WV', 'GHG', 'HNO3'],
+    gases=['WV', 'GHG', 'HNO3', 'Tatm'],
     variables=['avk', 'n', 'Tatmxavk']
     # variables=['avk']
 )
@@ -26,6 +26,7 @@ types = {'event': np.int, 'level_of_interest': np.int, 'err': np.float,
 wv = pd.read_csv(task.output()['WV'].path, dtype=types)
 ghg = pd.read_csv(task.output()['GHG'].path, dtype=types)
 nho3 = pd.read_csv(task.output()['HNO3'].path, dtype=types)
+tatm = pd.read_csv(task.output()['Tatm'].path, dtype=types)
 
 
 def filter_by(df: pd.DataFrame, var: str, level_of_interest: int, rc_error=True):
@@ -71,6 +72,14 @@ wv[
 ].groupby(['threshold', 'type']).mean()['err'].unstack().plot.bar(logy=True, rot=0)
 plt.show()
 
+# %%
+wv[
+    (wv['var'] == 'avk') &
+    (wv['type'] == 1)
+].groupby(['threshold', 'level_of_interest']).mean()['err'].unstack().plot.bar(logy=True, rot=0)
+plt.title('Error estimation for WV avk type 1')
+plt.show()
+
 # %% [markdown]
 # # Greenhouse gases
 
@@ -88,3 +97,9 @@ plot_error_estimation_for(nho3, 'NHO3', 'avk', -6)
 plot_error_estimation_for(nho3, 'NHO3', 'Tatmxavk', -6)
 # %%
 plot_error_estimation_for(nho3, 'NHO3', 'n', -6)
+
+# %% [markdown]
+# # Atmospheric Temperature
+plot_error_estimation_for(tatm, 'Tatm', 'avk', -10)
+# %%
+plot_error_estimation_for(tatm, 'Tatm', 'n', -10)

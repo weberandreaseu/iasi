@@ -13,7 +13,7 @@ class TestEvaluation(unittest.TestCase):
             # file='data/input/MOTIV-slice-1000.nc',
             dst='/tmp/iasi',
             force=True,
-            gases=['WV', 'GHG', 'HNO3'],
+            gases=['WV', 'GHG', 'HNO3', 'Tatm'],
             variables=['avk', 'n', 'Tatmxavk']
         )
         assert luigi.build([task], local_scheduler=True)
@@ -38,15 +38,16 @@ class TestEvaluation(unittest.TestCase):
             # file='data/input/MOTIV-slice-1000.nc',
             dst='/tmp/iasi',
             force_upstream=True,
-            gases=['WV', 'GHG', 'HNO3'],
+            gases=['WV', 'GHG', 'HNO3', 'Tatm'],
             variables=['avk', 'n', 'Tatmxavk']
         )
         assert luigi.build([task], local_scheduler=True)
         cls.wv = pd.read_csv(task.output()['WV'].path)
         cls.ghg = pd.read_csv(task.output()['GHG'].path)
         cls.hno3 = pd.read_csv(task.output()['HNO3'].path)
+        cls.tatm = pd.read_csv(task.output()['Tatm'].path)
 
-    def verify_water_vapour(self):
+    def test_water_vapour(self):
         ##### type 1 error #####
 
         # water vapour: level 16
@@ -96,8 +97,11 @@ class TestEvaluation(unittest.TestCase):
             'Type 1 error should be smaller than type 2 error'
         )
 
-    def verify_greenhouse_gases(self, ghg: pd.DataFrame):
+    def test_greenhouse_gases_report_exists(self):
         self.assertGreater(len(self.ghg), 0)
 
-    def verify_nitrid_acid(self, ghg: pd.DataFrame):
+    def test_nitrid_acid_report_exists(self):
+        self.assertGreater(len(self.hno3), 0)
+
+    def test_atmospheric_temperature_report_exists(self):
         self.assertGreater(len(self.hno3), 0)

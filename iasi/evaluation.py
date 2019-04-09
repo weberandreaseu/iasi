@@ -103,8 +103,15 @@ class EvaluationErrorEstimation(EvaluationTask):
             'variable': self.variables
         }
         uncompressed_param_grid = list(ParameterGrid(uncompressed_parameter))
+        single_variables = tasks + \
+            [SelectSingleVariable(**params)
+             for params in uncompressed_param_grid]
+        # exclude cross average kernel from atmospheric temperature.
+        # atmospheric temperature has only avk and noise matrix
+        filtered = filter(lambda task: not(task.gas == 'Tatm') or not(
+            task.variable == 'Tatmxavk'), single_variables)
         return {
-            'single': tasks + [SelectSingleVariable(**params) for params in uncompressed_param_grid],
+            'single': filtered,
             'original': MoveVariables(dst=self.dst, file=self.file, force=self.force, force_upstream=self.force_upstream)
         }
 
@@ -153,6 +160,8 @@ class ErrorEstimation:
             return GreenhouseGas(nol, alt)
         if gas == 'HNO3':
             return NitridAcid(nol, alt)
+        if gas == 'Tatm':
+            return AtmosphericTemperature(nol, alt)
         raise ValueError(f'No error estimation implementation for gas {gas}')
 
     def __init__(self, nol, alt, type_two=False):
@@ -358,6 +367,25 @@ class NitridAcid(ErrorEstimation):
 
     # TODO validate
     def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+        if reconstructed is None:
+            return original
+        else:
+            return original - reconstructed
+
+
+class AtmosphericTemperature(ErrorEstimation):
+    # TODO what are levels of interest?
+    levels_of_interest = [-10]
+
+    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
+        assert not type2
+        if reconstructed is None:
+            return original - np.identity(covariance.nol)
+        else:
+            return original - reconstructed
+
+    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
+        assert not type2
         if reconstructed is None:
             return original
         else:
