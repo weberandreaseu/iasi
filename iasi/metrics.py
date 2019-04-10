@@ -77,6 +77,10 @@ class Covariance:
     def c_by_type1(self, A_) -> np.ndarray:
         return np.block([[A_[self.nol:, self.nol:], np.zeros((self.nol, self.nol))],
                          [-A_[self.nol:, :self.nol], np.identity(self.nol)]])
+    
+    def c_by_avk(self, avk):
+        A_ = self.type1_of(avk)
+        return self.c_by_type1(A_)
 
     def type2_of(self, matrix) -> np.ndarray:
         """A'' (see equation 15)

@@ -11,7 +11,7 @@ from iasi.composition import Composition
 from iasi.compression import CompressDataset, SelectSingleVariable
 from iasi.file import MoveVariables
 from iasi.metrics import Covariance
-from iasi.quadrant import Quadrant
+from iasi.quadrant import Quadrant, AssembleFourQuadrants
 from iasi.util import CustomTask
 import logging
 
@@ -95,12 +95,13 @@ class EvaluationErrorEstimation(EvaluationTask):
         original = Dataset(self.input()['original'].path)
         nol = original['atm_nol'][...]
         alt = original['atm_altitude'][...]
+        avk = original['/state/WV/avk'][...]
         for gas in self.gases:
             gas_report = pd.DataFrame()
             # group tasks and input by gas
             gas_task_and_input = filter(
                 lambda tai: tai[0].gas == gas, tasks_and_input)
-            gas_error_estimation = ErrorEstimation.factory(gas, nol, alt)
+            gas_error_estimation = ErrorEstimation.factory(gas, nol, alt, avk)
             for task, input in gas_task_and_input:
                 # output_df, task, gas, variables
                 nc = Dataset(input.path)
@@ -127,9 +128,9 @@ class ErrorEstimation:
     levels_of_interest = []
 
     @staticmethod
-    def factory(gas: str, nol, alt):
+    def factory(gas: str, nol, alt, avk):
         if gas == 'WV':
-            return WaterVapour(nol, alt, type_two=True)
+            return WaterVapour(nol, alt, avk, type_two=True)
         if gas == 'GHG':
             return GreenhouseGas(nol, alt)
         if gas == 'HNO3':
@@ -180,13 +181,20 @@ class ErrorEstimation:
                 rc_event = rc_event.data
             else:
                 rc_event = None
-
+            if isinstance(self, WaterVapour):
+                avk_event = AssembleFourQuadrants().transform(
+                    self.avk[event], nol_event)
+                if avk_event.mask.any():
+                    logger.warn('Original avk contains masked values')
+                avk_event = avk_event.data
+            else:
+                avk_event = None
             # type two error only exists for water vapour
             # if gas does not require type 2 error estimation, break loop after first iteration
             calc_type_two = self.type_two
             while True:
                 error = estimation_method(
-                    original_event.data, rc_event, covariance, type2=calc_type_two)
+                    original_event.data, rc_event, covariance, type2=calc_type_two, avk=avk_event)
                 for loi in self.levels_of_interest:
                     level = nol_event + loi
                     if level < 2:
@@ -203,22 +211,28 @@ class ErrorEstimation:
                 calc_type_two = False
         return pd.DataFrame(result)
 
-    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
+    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         raise NotImplementedError
 
-    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
+    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         raise NotImplementedError
 
-    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
+    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         raise NotImplementedError
 
 
 class WaterVapour(ErrorEstimation):
-    levels_of_interest = [-16, -20]
-    # for each method type one and type two
+    levels_of_interest = [-16, -19]
 
-    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+    def __init__(self, nol, alt, avk, type_two=True):
+        super().__init__(nol, alt, type_two=type_two)
+        self.avk = avk
+
+    # for each method type one and type two
+    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         rc_error = reconstructed is not None
+        # in this method, avk should be same like original
+        assert np.equal(original, avk).all()
         if type2:
             # type 2 error
             original_type2 = covariance.type2_of(original)
@@ -241,104 +255,120 @@ class WaterVapour(ErrorEstimation):
                 rc_type1 = covariance.type1_of(reconstructed)
                 return covariance.smoothing_error(original_type1, rc_type1)
 
-    def noise_matrix(self, original, reconstruced, covariance, type2=False) -> np.ndarray:
+    def noise_matrix(self, original: np.ndarray, reconstruced: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         # original/approx event is already covariance matrix -> only type1/2 transformation
-        original_type1 = covariance.type1_of(original)
-        if reconstruced is None:
-            return original_type1
-        else:
-            return original_type1 - covariance.type1_of(reconstruced)
-
-    def cross_averaging_kernel(self, original, reconstruced, covariance, type2=False) -> np.ndarray:
-        # original_type1 = covariance.type1_of(original)
+        assert avk is not None
         P = covariance.traf()
-        original_type1 = P @ original
-        # TODO: what is the ideal cross averaging kernel?
-        # original error
-        identity = np.block([
-            [np.identity(covariance.nol)],
-            [np.zeros(shape=(covariance.nol, covariance.nol))]
-        ])
-        if reconstruced is None:
-            rc_type1 = identity
+        if type2:
+            # type 2 error
+            # TODO verify correct transformation
+            C = covariance.c_by_avk(avk)
+            original_type2 = C @ P @ original @ P.T @ C.T
+            if reconstruced is None:
+                # original error
+                return original_type2
+            else:
+                # reconstruction error
+                rc_type2 = C @ P @ reconstruced @ P.T @ C.T
+                return np.absolute(original_type2 - rc_type2)
         else:
+            # type 1 error
+            original_type1 = P @ original @ P.T
+            if reconstruced is None:
+                return original_type1
+            else:
+                rc_type1 = P @ reconstruced @ P.T
+                return np.absolute(original_type1 - rc_type1)
+
+    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
+        assert avk is not None
+        P = covariance.traf()
+        s_cov = covariance.assumed_covariance(species=1)
+        if type2:
+            # type 2 error
+            C = covariance.c_by_avk(avk)
+            original_type2 = C @ P @ original
+            if reconstructed is None:
+                # original error
+                return original_type2 @ s_cov @ original_type2.T
             # reconstruction error
-            rc_type1 = P @ reconstruced
-        return covariance.smoothing_error(original_type1, rc_type1, species=1)
+            rc_type2 = C @ P @ reconstructed
+            return covariance.smoothing_error(original_type2, rc_type2, species=1)
+        else:
+            # type 1 error
+            original_type1 = P @ original
+            if reconstructed is None:
+                # original error
+                return original_type1 @ s_cov @ original_type1.T
+            else:
+                # reconstruction error
+                rc_type1 = P @ reconstructed
+                return covariance.smoothing_error(original_type1, rc_type1, species=1)
 
 
 class GreenhouseGas(ErrorEstimation):
     levels_of_interest = [-10, -19]
 
-    # TODO validate
-    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         assert not type2
         if reconstructed is None:
             # original error
             reconstructed = np.identity(covariance.nol * 2)
-        # TODO GHG correct weight in assumed covariance?
         return covariance.smoothing_error(original, reconstructed, species=2, w2=1)
 
-    # TODO validate
-    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         assert not type2
         if reconstructed is None:
             # TODO: what is the ideal cross averaging kernel?
             # original error
-            reconstructed = np.block([
-                [np.identity(covariance.nol)],
-                [np.zeros(shape=(covariance.nol, covariance.nol))]
-            ])
+            s_cov = covariance.assumed_covariance(species=1)
+            return original @ s_cov @ original.T
         return covariance.smoothing_error(original, reconstructed, species=1)
 
-    # TODO validate
-    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         if reconstructed is None:
             return original
         else:
-            return original - reconstructed
+            return np.absolute(original - reconstructed)
 
 
 class NitridAcid(ErrorEstimation):
     levels_of_interest = [-6]
 
-    # TODO validate
-    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         assert not type2
         if reconstructed is None:
             # original error
             reconstructed = np.identity(covariance.nol)
         return covariance.smoothing_error(original, reconstructed, species=1)
 
-    # TODO validate
-    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         if reconstructed is None:
-            # TODO: what is the ideal cross averaging kernel?
             # original error
-            reconstructed = np.identity(covariance.nol)
+            s_cov = covariance.assumed_covariance(species=1)
+            return original @ s_cov @ original.T
         return covariance.smoothing_error(original, reconstructed, species=1)
 
-    # TODO validate
-    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False) -> np.ndarray:
+    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         if reconstructed is None:
             return original
         else:
-            return original - reconstructed
+            return np.absolute(original - reconstructed)
 
 
 class AtmosphericTemperature(ErrorEstimation):
-    # TODO what are levels of interest?
-    levels_of_interest = [-10]
+    # TODO add lowest nol
+    levels_of_interest = [-19]
 
-    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
+    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         assert not type2
         if reconstructed is None:
             reconstructed = np.identity(covariance.nol)
         return covariance.smoothing_error(original, reconstructed, species=1)
 
-    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False):
+    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         assert not type2
         if reconstructed is None:
             return original
         else:
-            return original - reconstructed
+            return np.absolute(original - reconstructed)
