@@ -33,24 +33,25 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
 
     def run(self):
         input = Dataset(self.input().path)
-        output = Dataset(self.output().path, 'w', format=self.format)
-        self.copy_dimensions(input, output)
-        self.copy_variables(input, output)
-        levels = input['atm_nol'][...]
-        dim_levels = input.dimensions['atmospheric_grid_levels'].size
-        dim_species = input.dimensions['atmospheric_species'].size
-        output.createGroup('state')
-        output.createDimension(
-            'double_atmospheric_grid_levels', dim_levels * dim_species)
-        for group, var in child_variables_of(input['state']):
-            try:
-                dec = Decomposition.factory(var, self.threshold)
-                dec.decompose(output, group, var, levels,
-                              dim_species, dim_levels)
-            except DecompositionException:
-                self.copy_variable(output, var, f'{group.path}/{var.name}')
-        input.close()
-        output.close()
+        with self.output().temporary_path() as target:
+            output = Dataset(target, 'w', format=self.format)
+            self.copy_dimensions(input, output)
+            self.copy_variables(input, output)
+            levels = input['atm_nol'][...]
+            dim_levels = input.dimensions['atmospheric_grid_levels'].size
+            dim_species = input.dimensions['atmospheric_species'].size
+            output.createGroup('state')
+            output.createDimension(
+                'double_atmospheric_grid_levels', dim_levels * dim_species)
+            for group, var in child_variables_of(input['state']):
+                try:
+                    dec = Decomposition.factory(var, self.threshold)
+                    dec.decompose(output, group, var, levels,
+                                dim_species, dim_levels)
+                except DecompositionException:
+                    self.copy_variable(output, var, f'{group.path}/{var.name}')
+            input.close()
+            output.close()
 
 
 @requires(CompressDataset)
@@ -64,20 +65,21 @@ class DecompressDataset(CompressionParams, CopyNetcdfFile):
 
     def run(self):
         input = Dataset(self.input().path)
-        output = Dataset(self.output().path, 'w', format=self.format)
-        self.copy_dimensions(input, output)
-        self.copy_variables(input, output)
-        levels = input['atm_nol'][...]
-        for group in child_groups_of(input['state']):
-            try:
-                comp = Composition.factory(group)
-                comp.reconstruct(levels, output)
-            except CompositionException:
-                for var in group.variables.values():
-                    self.copy_variable(
-                        output, var, path=f'{group.path}/{var.name}')
-        input.close()
-        output.close()
+        with self.output().temporary_path() as target:
+            output = Dataset(target, 'w', format=self.format)
+            self.copy_dimensions(input, output)
+            self.copy_variables(input, output)
+            levels = input['atm_nol'][...]
+            for group in child_groups_of(input['state']):
+                try:
+                    comp = Composition.factory(group)
+                    comp.reconstruct(levels, output)
+                except CompositionException:
+                    for var in group.variables.values():
+                        self.copy_variable(
+                            output, var, path=f'{group.path}/{var.name}')
+            input.close()
+            output.close()
 
 
 class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
@@ -115,21 +117,22 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
 
     def run(self):
         input = Dataset(self.input().path, 'r')
-        output = Dataset(self.output().path, 'w', format=self.format)
-        self.copy_dimensions(input, output)
-        # attribute can be netcdf variable or group (in case of decomposition)
-        if self.gas:
-            var_path = os.path.join('/state', self.gas, self.variable)
-        else:
-            var_path = self.variable
-        attribute = input[var_path]
-        if isinstance(attribute, Group):
-            for var in attribute.variables.values():
+        with self.output().temporary_path() as target:
+            output = Dataset(target, 'w', format=self.format)
+            self.copy_dimensions(input, output)
+            # attribute can be netcdf variable or group (in case of decomposition)
+            if self.gas:
+                var_path = os.path.join('/state', self.gas, self.variable)
+            else:
+                var_path = self.variable
+            attribute = input[var_path]
+            if isinstance(attribute, Group):
+                for var in attribute.variables.values():
+                    compressed = self.ancestor == 'CompressDataset'
+                    self.copy_variable(
+                        output, var, f'{attribute.path}/{var.name}', compressed=compressed)
+            else:
+                assert isinstance(attribute, Variable)
                 compressed = self.ancestor == 'CompressDataset'
-                self.copy_variable(
-                    output, var, f'{attribute.path}/{var.name}', compressed=compressed)
-        else:
-            assert isinstance(attribute, Variable)
-            compressed = self.ancestor == 'CompressDataset'
-            self.copy_variable(output, attribute, var_path,
-                               compressed=compressed)
+                self.copy_variable(output, attribute, var_path,
+                                compressed=compressed)

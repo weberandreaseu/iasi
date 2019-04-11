@@ -81,14 +81,12 @@ class CopyNetcdfFile(CustomTask):
 
     def run(self):
         input = Dataset(self.input().path, 'r')
-        try:
-            output = Dataset(self.output().path, 'w', format=self.format)
-        except PermissionError as pe:
-            logging.error('Permission error. File %s probably exists already', self.output().path)
-        self.copy_dimensions(input, output)
-        self.copy_variables(input, output)
-        input.close()
-        output.close()
+        with self.output().temporary_path() as target:
+            output = Dataset(target, 'w', format=self.format)
+            self.copy_dimensions(input, output)
+            self.copy_variables(input, output)
+            input.close()
+            output.close()
 
     def copy_dimensions(self, input: Dataset, output: Dataset) -> None:
         for name, dim in input.dimensions.items():

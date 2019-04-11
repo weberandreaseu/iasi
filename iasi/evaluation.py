@@ -83,7 +83,8 @@ class EvaluationCompressionSize(EvaluationTask):
                 'size': self.size_in_kb(input.path),
                 'threshold': task.threshold
             }, ignore_index=True)
-        df.to_csv(self.output().path, index=False)
+        with self.output().temporary_path() as target:
+            df.to_csv(target, index=False)
 
 
 class EvaluationErrorEstimation(EvaluationTask):
@@ -115,8 +116,8 @@ class EvaluationErrorEstimation(EvaluationTask):
                 report['var'] = task.variable
                 gas_report = gas_report.append(report)
                 nc.close()
-            with self.output()[gas].open('w') as file:
-                gas_report.to_csv(file, index=False)
+            with self.output()[gas].temporary_path() as target:
+                gas_report.to_csv(target, index=False)
         original.close()
 
     def output(self):
@@ -146,7 +147,10 @@ class ErrorEstimation:
         self.alt = alt
 
     def report_for(self, variable: Variable, original, reconstructed, rc_error) -> pd.DataFrame:
-        assert original.shape == reconstructed.shape
+        if not original.shape == reconstructed.shape:
+            message = f'Different shape for {type(self).__name__} {variable.name}: original {original.shape}, reconstructed {reconstructed.shape}'
+            logger.error(message)
+            raise ValueError(message)
         result = {
             'event': [],
             'level_of_interest': [],

@@ -8,6 +8,8 @@ from iasi.file import CopyNetcdfFile, MoveVariables
 from iasi.quadrant import Quadrant
 
 
+logger = logging.getLogger(__name__)
+
 class CompositionException(Exception):
     pass
 
@@ -48,7 +50,7 @@ class SingularValueComposition(Composition):
         result = np.ma.masked_all(q.transformed_shape(), dtype=np.float32)
         for event in range(self.Vh.shape[0]):
             if np.ma.is_masked(nol[event]) or nol.data[event] > 29:
-                logging.warning('Skipping event %d', event)
+                logger.warning('Skipping event %d', event)
                 continue
             level = int(nol.data[event])
             U = self.U[event][...]
@@ -76,7 +78,7 @@ class EigenComposition(Composition):
         result = np.ma.masked_all(q.transformed_shape(), dtype=np.float32)
         for event in range(self.Q.shape[0]):
             if np.ma.is_masked(nol[event]) or nol.data[event] > 29:
-                logging.warning('Skipping event %d', event)
+                logger.warning('Skipping event %d', event)
                 continue
             level = int(nol.data[event])
             Q = self.Q[event][...]

@@ -47,8 +47,8 @@ class AposterioriProcessing(CustomTask):
         for event in range(events):
             self.process_event(event)
         df = pd.DataFrame(self.result)
-        with self.output().open('w') as file:
-            df.to_csv(file, index=None)
+        with self.output().temporary_path() as target:
+            df.to_csv(target, index=None)
 
     def process_event(self, event: int):
         # skip masked events
