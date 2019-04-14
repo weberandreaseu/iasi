@@ -17,12 +17,14 @@ class TestQuadrants(unittest.TestCase):
         compression = CompressDataset(
             file=file,
             dst='/tmp/iasi',
-            force=True
+            force=True,
+            log=False
         )
         uncompressed = MoveVariables(
             file=file,
             dst='/tmp/iasi',
             force=True,
+            log=False
         )
         assert luigi.build([compression, uncompressed], local_scheduler=True)
         cls.compressed = Dataset(compression.output().path)

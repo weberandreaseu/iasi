@@ -1,4 +1,4 @@
-import logging as logger
+import logging
 import os
 from math import ceil
 from typing import Dict, List, Tuple
@@ -9,11 +9,13 @@ from luigi.util import common_params, inherits, requires
 from netCDF4 import Dataset, Group, Variable
 from scipy import linalg
 
-from iasi.decomposition import Decomposition, DecompositionException
 from iasi.composition import Composition, CompositionException
+from iasi.decomposition import Decomposition, DecompositionException
 from iasi.file import CopyNetcdfFile, MoveVariables
 from iasi.quadrant import Quadrant
 from iasi.util import child_groups_of, child_variables_of
+
+logger = logging.getLogger(__name__)
 
 
 class CompressionParams(luigi.Config):
@@ -29,7 +31,12 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
         return MoveVariables(file=self.file, dst=self.dst, exclusion_pattern=None, force=self.force)
 
     def output(self):
-        return self.create_local_target('compression', str(self.threshold), file=self.file)
+        path = self.create_local_path(
+            'compression', str(self.threshold), file=self.file)
+        return luigi.LocalTarget(path=path)
+
+    def log_file(self):
+        return self.create_local_path('compression', str(self.threshold), file=self.file, ext='log')
 
     def run(self):
         input = Dataset(self.input().path)
@@ -43,13 +50,23 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
             output.createGroup('state')
             output.createDimension(
                 'double_atmospheric_grid_levels', dim_levels * dim_species)
-            for group, var in child_variables_of(input['state']):
+            variables = list(child_variables_of(input['state']))
+            counter = 1
+            for group, var in variables:
+                message = f'Compressing variable {counter} of {len(variables)}: {group.path}/{var.name}'
+                self.set_status_message(message)
+                progress = int((counter / len(variables)) * 100)
+                self.set_progress_percentage(progress)
                 try:
                     dec = Decomposition.factory(var, self.threshold)
+                    logger.info(f'Decompose {group.path}/{var.name}')
                     dec.decompose(output, group, var, levels,
-                                dim_species, dim_levels)
+                                  dim_species, dim_levels)
                 except DecompositionException:
+                    logger.info(
+                        f'{group.path}/{var.name} cannot be decomposed. copy without compression')
                     self.copy_variable(output, var, f'{group.path}/{var.name}')
+                counter += 1
             input.close()
             output.close()
 
@@ -63,6 +80,9 @@ class DecompressDataset(CompressionParams, CopyNetcdfFile):
     def output(self):
         return self.create_local_target('decompression', str(self.threshold), file=self.file)
 
+    def log_file(self):
+        return self.create_local_path('decompression', str(self.threshold), file=self.file, ext='log')
+
     def run(self):
         input = Dataset(self.input().path)
         with self.output().temporary_path() as target:
@@ -70,7 +90,14 @@ class DecompressDataset(CompressionParams, CopyNetcdfFile):
             self.copy_dimensions(input, output)
             self.copy_variables(input, output)
             levels = input['atm_nol'][...]
-            for group in child_groups_of(input['state']):
+            groups = list(child_groups_of(input['state']))
+            counter = 0
+            for group in groups:
+                counter += 1
+                message = f'Reconstruct group {counter} of {len(groups)}: {group.path}'
+                self.set_status_message(message)
+                self.set_progress_percentage(int(counter / len(groups) * 100))
+                logger.info(message)
                 try:
                     comp = Composition.factory(group)
                     comp.reconstruct(levels, output)
@@ -135,4 +162,4 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
                 assert isinstance(attribute, Variable)
                 compressed = self.ancestor == 'CompressDataset'
                 self.copy_variable(output, attribute, var_path,
-                                compressed=compressed)
+                                   compressed=compressed)

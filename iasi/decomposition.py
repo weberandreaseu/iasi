@@ -6,6 +6,8 @@ from netCDF4 import Dataset, Group, Variable
 from iasi.quadrant import Quadrant
 
 
+logger = logging.getLogger(__name__)
+
 class DecompositionException(Exception):
     pass
 
@@ -33,19 +35,19 @@ class Decomposition:
         most_significant = eigenvalues[0]
         return list(filter(lambda eig: eig > most_significant * self.threshold, eigenvalues))
 
-    def matrix_ok(self, event, var, matrix):
+    def matrix_ok(self, event, path, matrix):
         ok = True
         if np.ma.is_masked(matrix):
-            logging.warning(
-                'event %d contains masked values in %s. skipping', event, var.name)
+            logger.warning(
+                'event %d contains masked values in %s. skipping...', event, path)
             ok = False
         if np.isnan(matrix).any():
-            logging.warning(
-                'event %d contains nan values in %s. skipping', event, var.name)
+            logger.warning(
+                'event %d contains nan values in %s. skipping...', event, path)
             ok = False
         if np.isinf(matrix).any():
-            logging.warning(
-                'event %d contains inf values in %s. skipping', event, var.name)
+            logger.warning(
+                'event %d contains inf values in %s. skipping...', event, path)
             ok = False
         return ok
 
@@ -61,13 +63,14 @@ class SingularValueDecomposition(Decomposition):
         all_U = np.ma.masked_all((events, upper_bound, lower_bound))
         all_s = np.ma.masked_all((events, lower_bound))
         all_Vh = np.ma.masked_all((events, lower_bound, lower_bound))
+        path = f'{group.path}/{var.name}/'
         for event in range(var.shape[0]):
             if np.ma.is_masked(levels[event]) or levels.data[event] > 29:
                 continue
             # reduce array dimensions
             level = int(levels.data[event])
             matrix = q.transform(var[event][...], level)
-            if not self.matrix_ok(event, var, matrix):
+            if not self.matrix_ok(event, path, matrix):
                 continue
             # decompose reduced array
             U, s, Vh = np.linalg.svd(matrix.data, full_matrices=False)
@@ -84,7 +87,6 @@ class SingularValueDecomposition(Decomposition):
         # write all to output
         upper_dim, lower_dim = q.upper_and_lower_dimension()
         # TODO add group description
-        path = f'{group.path}/{var.name}/'
         U_dim = ('event', upper_dim, lower_dim)
         U_out = output.createVariable(path + 'U', 'f', U_dim, zlib=True)
         U_out[:] = all_U[:]
@@ -106,6 +108,7 @@ class EigenDecomposition(Decomposition):
         # should be always the same because reshaped variable is square
         all_Q = np.ma.masked_all((events, bound, bound))
         all_s = np.ma.masked_all((events, bound))
+        path = f'{group.path}/{var.name}/'
         for event in range(var.shape[0]):
             if np.ma.is_masked(levels[event]) or levels.data[event] > 29:
                 continue
@@ -113,7 +116,7 @@ class EigenDecomposition(Decomposition):
             # reduce array dimensions
             matrix = q.transform(var[event][...], level)
             # decompose reduced array
-            if not self.matrix_ok(event, var, matrix):
+            if not self.matrix_ok(event, path, matrix):
                 continue
             # TODO: use np.linalg.eigh for square matrices (probably more performant)
             eigenvalues, eigenvectors = np.linalg.eig(matrix)
@@ -127,7 +130,6 @@ class EigenDecomposition(Decomposition):
                 logging.error('Failed to assign values')
         # write all to output
         dimension_name, _ = q.upper_and_lower_dimension()
-        path = f'{group.path}/{var.name}/'
         Q_dim = ('event', dimension_name, dimension_name)
         Q_out = output.createVariable(path + '/Q', 'f', Q_dim, zlib=True)
         Q_out[:] = all_Q[:]

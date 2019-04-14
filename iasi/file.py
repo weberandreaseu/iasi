@@ -10,6 +10,8 @@ from netCDF4 import Dataset, Variable, Group
 from iasi.util import CustomTask, child_variables_of
 import logging
 
+logger = logging.getLogger(__name__)
+
 
 class ReadFile(luigi.ExternalTask):
     """Basic class for reading a local file as input for a luigi task."""
@@ -90,28 +92,38 @@ class CopyNetcdfFile(CustomTask):
 
     def copy_dimensions(self, input: Dataset, output: Dataset) -> None:
         for name, dim in input.dimensions.items():
-            output.createDimension(name, len(dim) if not dim.isunlimited() else None)
+            output.createDimension(
+                name, len(dim) if not dim.isunlimited() else None)
 
     def copy_variable(self,  target: Dataset, var: Variable, path: str = None, compressed: bool = False) -> Variable:
         if path:
-            out_var = target.createVariable(path, var.datatype, var.dimensions, zlib=compressed)
+            out_var = target.createVariable(
+                path, var.datatype, var.dimensions, zlib=compressed)
         else:
-            out_var = target.createVariable(var.name, var.datatype, var.dimensions, zlib=compressed)
+            out_var = target.createVariable(
+                var.name, var.datatype, var.dimensions, zlib=compressed)
         out_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
         out_var[:] = var[:]
 
     def copy_variables(self, input: Dataset, output: Dataset) -> None:
-        for group, var in child_variables_of(input):
+        input_variables = list(child_variables_of(input))
+        counter = 0
+        for group, var in input_variables:
+            counter += 1
             if group.path == '/':
                 path = var.name
             else:
                 path = f'{group.path}/{var.name}'
             if self.exclusion_pattern and re.match(self.exclusion_pattern, path):
                 continue
+            message = f'Copying variable {counter} of {len(input_variables)} {path}'
+            self.set_status_message(message)
+            logger.info(message)
             self.copy_variable(output, var, self.mapping.get(var.name, path))
 
 
 class MoveVariables(CopyNetcdfFile):
     "Create a copy of netCDF file with variables organized in subgroups"
+
     def output(self):
         return self.create_local_target('groups', file=self.file)

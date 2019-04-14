@@ -22,6 +22,7 @@ class EvaluationTask(CustomTask):
     file = luigi.Parameter()
     gases = luigi.ListParameter()
     variables = luigi.ListParameter()
+    threshold_values = luigi.ListParameter(default=[1e-2, 1e-3, 1e-4, 1e-5])
     ancestor = None
 
     def requires(self):
@@ -31,7 +32,7 @@ class EvaluationTask(CustomTask):
             'dst': [self.dst],
             'force': [self.force],
             'force_upstream': [self.force_upstream],
-            'threshold': [1e-2, 1e-3, 1e-4, 1e-5],
+            'threshold': self.threshold_values,
             'gas': self.gases,
             'variable': self.variables
         }
@@ -107,6 +108,7 @@ class EvaluationErrorEstimation(EvaluationTask):
                 # output_df, task, gas, variables
                 nc = Dataset(input.path)
                 var = task.variable
+                logger.info('Calculating error estimation for %s %s with threshold %f', gas, var, task.threshold)
                 path = f'/state/{gas}/{var}'
                 approx_values = nc[path][...]
                 original_values = original[path][...]
@@ -172,6 +174,7 @@ class ErrorEstimation:
         for event in range(original.shape[0]):
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
+            logger.info('Error for %d', event)
             nol_event = self.nol.data[event]
             covariance = Covariance(nol_event, self.alt[event])
             original_event = reshaper.transform(original[event], nol_event)
@@ -234,9 +237,9 @@ class WaterVapour(ErrorEstimation):
 
     # for each method type one and type two
     def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
-        rc_error = reconstructed is not None
         # in this method, avk should be same like original
-        assert np.equal(original, avk).all()
+        if not np.allclose(original, avk):
+            logger.warn('There are differences in original paarmeter and avk')
         if type2:
             # type 2 error
             original_type2 = covariance.type2_of(original)

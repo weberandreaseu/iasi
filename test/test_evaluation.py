@@ -14,7 +14,8 @@ class TestEvaluation(unittest.TestCase):
             dst='/tmp/iasi',
             force=True,
             gases=['WV', 'GHG', 'HNO3', 'Tatm'],
-            variables=['avk', 'n', 'Tatmxavk']
+            variables=['avk', 'n', 'Tatmxavk'],
+            log=False
         )
         assert luigi.build([task], local_scheduler=True)
 
