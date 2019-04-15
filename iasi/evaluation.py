@@ -160,6 +160,11 @@ class VariableErrorEstimation(CustomTask):
         nol = original['atm_nol'][...]
         alt = original['atm_altitude'][...]
         avk = original['/state/WV/avk'][...]
+        counter = 0
+        message = f'Calculate original error for {path}: {counter}/{len(tasks_and_input)}'
+        logger.info(message)
+        self.set_status_message(message)
+        self.set_progress_percentage(int(counter / len(tasks_and_input) * 100))
         error_estimation: ErrorEstimation = ErrorEstimation.factory(
             self.gas, nol, alt, avk)
         # calculation of original error
@@ -168,10 +173,13 @@ class VariableErrorEstimation(CustomTask):
         variable_report['threshold'] = 0
         # calculation of reconstruction error
         for task, input in tasks_and_input:
-            # output_df, task, gas, variables
+            counter += 1
             nc = Dataset(input.path)
-            message = f'Calculating error estimation for {path} with threshold {task.threshold}'
+            message = f'Calculating error estimation {counter} of {len(tasks_and_input)} for {path} with threshold {task.threshold}'
             logger.info(message)
+            self.set_status_message(message)
+            self.set_progress_percentage(
+                int(counter / len(tasks_and_input) * 100))
             reconstructed_values = nc[path][...]
             original_values = original[path][...]
             report = error_estimation.report_for(
