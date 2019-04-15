@@ -197,6 +197,9 @@ class VariableErrorEstimation(CustomTask):
         # one error estimation report for each gas
         return self.create_local_target('error-estimation', self.gas, self.variable, file=self.file, ext='csv')
 
+    def log_file(self):
+        return self.create_local_path('error-estimation', self.gas, self.variable, file=self.file, ext='log')
+
 
 class ErrorEstimation:
     levels_of_interest = []
