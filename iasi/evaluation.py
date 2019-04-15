@@ -8,7 +8,7 @@ from netCDF4 import Dataset, Group, Variable
 from sklearn.model_selection import ParameterGrid
 
 from iasi.composition import Composition
-from iasi.compression import CompressDataset, SelectSingleVariable
+from iasi.compression import CompressDataset, SelectSingleVariable, DecompressDataset
 from iasi.file import MoveVariables
 from iasi.metrics import Covariance
 from iasi.quadrant import Quadrant, AssembleFourQuadrants
@@ -88,43 +88,106 @@ class EvaluationCompressionSize(EvaluationTask):
             df.to_csv(target, index=False)
 
 
-class EvaluationErrorEstimation(EvaluationTask):
-    ancestor = 'DecompressDataset'
+class EvaluationErrorEstimation(CustomTask):
+    file = luigi.Parameter()
+    gases = luigi.Parameter()
+    variables = luigi.Parameter()
+    thresholds = luigi.ListParameter(default=[1e-3])
+
+    def requires(self):
+        parameter = {
+            'file': [self.file],
+            'dst': [self.dst],
+            'force': [self.force],
+            'force_upstream': [self.force_upstream],
+            'thresholds': [self.thresholds],
+            'gas': self.gases,
+            'variable': self.variables,
+            'log': [self.log]
+        }
+        parameter_grid = ParameterGrid(parameter)
+        # exclude cross average kernel from atmospheric temperature.
+        # atmospheric temperature has only avk and noise matrix
+        parameter_grid = filter(lambda params: not(params['gas'] == 'Tatm') or not(
+            params['variable'] == 'Tatmxavk'), parameter_grid)
+        return [VariableErrorEstimation(**params) for params in parameter_grid]
 
     def run(self):
+        report = pd.DataFrame()
+        for task in self.input():
+            with task.open() as file:
+                task_report = pd.read_csv(file)
+                report = report.append(task_report)
+        with self.output().temporary_path() as target:
+            report.to_csv(target, index=False)
+
+    def output(self):
+        return self.create_local_target('error-estimation', file=self.file, ext='csv')
+
+
+class VariableErrorEstimation(CustomTask):
+
+    file = luigi.Parameter()
+    gas = luigi.Parameter()
+    variable = luigi.Parameter()
+    thresholds = luigi.ListParameter(default=[1e-3])
+
+    def requires(self):
+        compressed = [DecompressDataset(
+            dst=self.dst,
+            file=self.file,
+            threshold=threshold,
+            force=self.force,
+            force_upstream=self.force_upstream,
+            log=self.log
+        ) for threshold in self.thresholds]
+        original = MoveVariables(dst=self.dst,
+                                 file=self.file,
+                                 log=self.log,
+                                 force=self.force,
+                                 force_upstream=self.force_upstream)
+        return {
+            'compressed': compressed,
+            'original': original
+        }
+
+    def run(self):
+        path = f'/state/{self.gas}/{self.variable}'
+        logger.info('Starting error estimation for %s', path)
         tasks_and_input = list(zip(
-            self.requires()['single'], self.input()['single']))
+            self.requires()['compressed'], self.input()['compressed']))
         original = Dataset(self.input()['original'].path)
         nol = original['atm_nol'][...]
         alt = original['atm_altitude'][...]
         avk = original['/state/WV/avk'][...]
-        for gas in self.gases:
-            gas_report = pd.DataFrame()
-            # group tasks and input by gas
-            gas_task_and_input = filter(
-                lambda tai: tai[0].gas == gas, tasks_and_input)
-            gas_error_estimation = ErrorEstimation.factory(gas, nol, alt, avk)
-            for task, input in gas_task_and_input:
-                # output_df, task, gas, variables
-                nc = Dataset(input.path)
-                var = task.variable
-                logger.info('Calculating error estimation for %s %s with threshold %f', gas, var, task.threshold)
-                path = f'/state/{gas}/{var}'
-                approx_values = nc[path][...]
-                original_values = original[path][...]
-                report = gas_error_estimation.report_for(
-                    original[path], original_values, approx_values, task.ancestor != 'MoveVariables')
-                report['threshold'] = task.threshold
-                report['var'] = task.variable
-                gas_report = gas_report.append(report)
-                nc.close()
-            with self.output()[gas].temporary_path() as target:
-                gas_report.to_csv(target, index=False)
+        error_estimation: ErrorEstimation = ErrorEstimation.factory(
+            self.gas, nol, alt, avk)
+        # calculation of original error
+        variable_report = error_estimation.report_for(
+            original[path], original[path][...], None, rc_error=False)
+        variable_report['threshold'] = 0
+        # calculation of reconstruction error
+        for task, input in tasks_and_input:
+            # output_df, task, gas, variables
+            nc = Dataset(input.path)
+            message = f'Calculating error estimation for {path} with threshold {task.threshold}'
+            logger.info(message)
+            reconstructed_values = nc[path][...]
+            original_values = original[path][...]
+            report = error_estimation.report_for(
+                original[path], original_values, reconstructed_values, rc_error=True)
+            report['threshold'] = task.threshold
+            variable_report = variable_report.append(report, ignore_index=True)
+            nc.close()
+        variable_report['var'] = self.variable
+        variable_report['gas'] = self.gas
+        with self.output().temporary_path() as target:
+            variable_report.to_csv(target, index=False)
         original.close()
 
     def output(self):
         # one error estimation report for each gas
-        return {gas: self.create_local_target('error-estimation', gas, file=self.file, ext='csv') for gas in self.gases}
+        return self.create_local_target('error-estimation', self.gas, self.variable, file=self.file, ext='csv')
 
 
 class ErrorEstimation:
@@ -149,10 +212,10 @@ class ErrorEstimation:
         self.alt = alt
 
     def report_for(self, variable: Variable, original, reconstructed, rc_error) -> pd.DataFrame:
-        if not original.shape == reconstructed.shape:
-            message = f'Different shape for {type(self).__name__} {variable.name}: original {original.shape}, reconstructed {reconstructed.shape}'
-            logger.error(message)
-            raise ValueError(message)
+        # if not original.shape == reconstructed.shape:
+        #     message = f'Different shape for {type(self).__name__} {variable.name}: original {original.shape}, reconstructed {reconstructed.shape}'
+        #     logger.error(message)
+        #     raise ValueError(message)
         result = {
             'event': [],
             'level_of_interest': [],
@@ -174,7 +237,6 @@ class ErrorEstimation:
         for event in range(original.shape[0]):
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
-            logger.info('Error for %d', event)
             nol_event = self.nol.data[event]
             covariance = Covariance(nol_event, self.alt[event])
             original_event = reshaper.transform(original[event], nol_event)

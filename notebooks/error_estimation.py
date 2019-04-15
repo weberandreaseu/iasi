@@ -10,33 +10,37 @@ import pandas as pd
 from iasi.evaluation import EvaluationErrorEstimation
 
 task = EvaluationErrorEstimation(
-    # force_upstream=True,
+    force_upstream=True,
     dst='data',
     file='data/input/MOTIV-slice-100.nc',
     # file='test/resources/MOTIV-single-event.nc',
     gases=['WV', 'GHG', 'HNO3', 'Tatm'],
-    variables=['avk', 'n', 'Tatmxavk']
+    variables=['avk', 'n', 'Tatmxavk'],
+    thresholds=[1e-2, 1e-3, 1e-4, 1e-5]
 )
 
 assert luigi.build([task], local_scheduler=True)
 
 types = {'event': np.int, 'level_of_interest': np.int, 'err': np.float,
-         type: np.int, 'rc_error': bool, 'threshold': np.float, 'var': str}
-wv = pd.read_csv(task.output()['WV'].path, dtype=types)
-ghg = pd.read_csv(task.output()['GHG'].path, dtype=types)
-nho3 = pd.read_csv(task.output()['HNO3'].path, dtype=types)
-tatm = pd.read_csv(task.output()['Tatm'].path, dtype=types)
+         type: np.int, 'rc_error': bool, 'threshold': np.float, 'var': str, 'gas': str}
+
+with task.output().open() as file:
+    df = pd.read_csv(file, dtype=types)
+    wv = df[df['gas'] == 'WV']
+    ghg = df[df['gas'] == 'GHG']
+    hno3 = df[df['gas'] == 'HNO3']
+    tatm = df[df['gas'] == 'Tatm']
 
 
-def filter_by(df: pd.DataFrame, var: str, level_of_interest: int, rc_error=True):
-    return df[(df['rc_error'] == rc_error) & (df['var'] == var) & (df['level_of_interest'] == level_of_interest)]
+def filter_by(df: pd.DataFrame, gas: str, var: str, level_of_interest: int, rc_error=True):
+    return df[(df['rc_error'] == rc_error) & (df['gas'] == gas) & (df['var'] == var) & (df['level_of_interest'] == level_of_interest)]
 
 
 def plot_error_estimation_for(df, gas: str, var: str, level_of_interest: int):
-    filtered_events = filter_by(df, var, level_of_interest)
+    filtered_events = filter_by(df, gas, var, level_of_interest)
     ax = filtered_events.groupby('threshold')[
         'err'].mean().plot.bar(logy=True, rot=0)
-    mean_error = filter_by(df, var, level_of_interest, False)['err'].mean()
+    mean_error = filter_by(df, gas, var, level_of_interest, False)['err'].mean()
     # set ylim to make line for cov error visible
     ax.set_ylim(top=mean_error * 5)
     ax.axhline(mean_error, color='red', label='Error')
@@ -91,14 +95,14 @@ plot_error_estimation_for(ghg, 'GHG', 'n', -10)
 # %% [markdown]
 # # Nitrid Acid
 
-plot_error_estimation_for(nho3, 'NHO3', 'avk', -6)
+plot_error_estimation_for(hno3, 'HNO3', 'avk', -6)
 # %%
-plot_error_estimation_for(nho3, 'NHO3', 'Tatmxavk', -6)
+plot_error_estimation_for(hno3, 'HNO3', 'Tatmxavk', -6)
 # %%
-plot_error_estimation_for(nho3, 'NHO3', 'n', -6)
+plot_error_estimation_for(hno3, 'HNO3', 'n', -6)
 
 # %% [markdown]
 # # Atmospheric Temperature
-plot_error_estimation_for(tatm, 'Tatm', 'avk', -10)
+plot_error_estimation_for(tatm, 'Tatm', 'avk', -19)
 # %%
-plot_error_estimation_for(tatm, 'Tatm', 'n', -10)
+plot_error_estimation_for(tatm, 'Tatm', 'n', -19)

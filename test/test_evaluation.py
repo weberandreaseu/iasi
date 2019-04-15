@@ -43,10 +43,12 @@ class TestEvaluation(unittest.TestCase):
             variables=['avk', 'n', 'Tatmxavk']
         )
         assert luigi.build([task], local_scheduler=True)
-        cls.wv = pd.read_csv(task.output()['WV'].path)
-        cls.ghg = pd.read_csv(task.output()['GHG'].path)
-        cls.hno3 = pd.read_csv(task.output()['HNO3'].path)
-        cls.tatm = pd.read_csv(task.output()['Tatm'].path)
+        with task.output().open() as file:
+            df = pd.read_csv(file)
+            cls.wv = df[df['gas'] == 'WV']
+            cls.ghg = df[df['gas'] == 'GHG']
+            cls.hno3 = df[df['gas'] == 'HNO3']
+            cls.atm = df[df['gas'] == 'Tatm']
 
     def test_water_vapour(self):
         ##### type 1 error #####

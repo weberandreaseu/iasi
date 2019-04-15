@@ -88,8 +88,9 @@ class CustomTask(luigi.Task):
         self._remove_log_hander()
 
     @luigi.Task.event_handler(luigi.Event.FAILURE)
-    def callback_failure(self):
-        logger.info('Task %s failed', type(self).__name__)
+    def callback_failure(self, error):
+        logger.error('Task %s failed', type(self).__name__)
+        logger.error('Message: %s', error)
         self._remove_log_hander()
 
     def _remove_log_hander(self):
