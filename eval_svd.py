@@ -7,10 +7,10 @@
 # %%
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import luigi
-from iasi import DeltaDRetrieval
+from iasi import AposterioriProcessing
 import numpy as np
 import pandas as pd
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 # disable logging
 import logging
@@ -19,13 +19,13 @@ logger.setLevel(logging.CRITICAL)
 
 # %%
 file = 'data/input/IASI-A_20160627_50269_v2018_fast_part0_20180413215350.nc'
-direct = DeltaDRetrieval(
+direct = AposterioriProcessing(
     dst='./data',
     file=file,
     dim=28
 )
 
-svd = [DeltaDRetrieval(
+svd = [AposterioriProcessing(
     dst='./data',
     file=file,
     svd=True,
@@ -84,9 +84,13 @@ H2O_error
 delD_error
 
 # %%
-delD_error.mae.plot()
+delD_error.mae.plot(logy=True)
 plt.show()
 
 
-H2O_error.mae.plot()
+H2O_error.mae.plot(logy=True)
 plt.show()
+
+
+#%%
+original.shape

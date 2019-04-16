@@ -1,2 +1,3 @@
-data/**/*.nc
-data/**/*.csv
+data/
+notebooks/playground.py
+.vscode/tags
