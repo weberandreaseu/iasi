@@ -1,8 +1,11 @@
 # %%
-from netCDF4 import Dataset
+
+import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
+from netCDF4 import Dataset
 
 
 def import_dataset(file: str) -> pd.DataFrame:
@@ -22,7 +25,7 @@ def import_dataset(file: str) -> pd.DataFrame:
     # filter north/south area
     df = df[(df.lat < 60) & (df.lat > -15)]
     # filter west/east area
-    df = df[(df.lon < 60) & (df.lon > -45)]
+    df = df[(df.lon > -60) & (df.lon < 45)]
     print('Events after filter: %d' % len(df))
     return df
 
@@ -40,7 +43,8 @@ plt.show()
 
 
 # %%
-plt.scatter(df.lat, df.lon)
-plt.xlabel('Latitude')
-plt.ylabel('Longitude')
+ax = plt.axes(projection=ccrs.PlateCarree())
+ax.set_extent([-65, 50, 65, -20], crs=ccrs.PlateCarree())
+ax.coastlines()
+ax.scatter(df.lon, df.lat, s=4)
 plt.show()
