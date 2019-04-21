@@ -8,6 +8,7 @@ from iasi.quadrant import Quadrant
 
 logger = logging.getLogger(__name__)
 
+
 class DecompositionException(Exception):
     pass
 
@@ -63,7 +64,9 @@ class SingularValueDecomposition(Decomposition):
         all_U = np.ma.masked_all((events, upper_bound, lower_bound))
         all_s = np.ma.masked_all((events, lower_bound))
         all_Vh = np.ma.masked_all((events, lower_bound, lower_bound))
+        all_k = np.ma.masked_all((events), dtype=np.int)
         path = f'{group.path}/{var.name}/'
+        max_k = 0
         for event in range(var.shape[0]):
             if np.ma.is_masked(levels[event]) or levels.data[event] > 29:
                 continue
@@ -77,26 +80,28 @@ class SingularValueDecomposition(Decomposition):
             # find k eigenvalues
             sigma = self.select_significant(s)
             k = len(sigma)
+            max_k = max(k, max_k)
             # assign sliced decomposition to all
-            try:
-                all_U[event][:U.shape[0], :k] = U[:, :k]
-                all_s[event][:k] = sigma
-                all_Vh[event][:k, :Vh.shape[1]] = Vh[:k, :]
-            except ValueError as error:
-                print(error)
+            all_k[event] = k
+            all_U[event][:U.shape[0], :k] = U[:, :k]
+            all_s[event][:k] = sigma
+            all_Vh[event][:k, :Vh.shape[1]] = Vh[:k, :]
         # write all to output
         upper_dim, lower_dim = q.upper_and_lower_dimension()
+        group = output.createGroup(path)
+        group.createDimension('rank', size=max_k)
         # TODO add group description
-        U_dim = ('event', upper_dim, lower_dim)
-        U_out = output.createVariable(path + 'U', 'f', U_dim, zlib=True)
-        U_out[:] = all_U[:]
-        s_dim = ('event', lower_dim)
-        s_out = output.createVariable(path + 's', 'f', s_dim, zlib=True)
-        s_out[:] = all_s[:]
-        Vh_dim = ('event', lower_dim, lower_dim)
-        Vh_out = output.createVariable(path + 'Vh', 'f', Vh_dim, zlib=True)
-        Vh_out[:] = all_Vh[:]
-
+        k_out = group.createVariable('k', 'i1', ('event'))
+        k_out[:] = all_k[:]
+        U_dim = ('event', upper_dim, 'rank')
+        U_out = group.createVariable('U', 'f', U_dim, zlib=True)
+        U_out[:] = all_U[:, :, :max_k]
+        s_dim = ('event', 'rank')
+        s_out = group.createVariable('s', 'f', s_dim, zlib=True)
+        s_out[:] = all_s[:, :max_k]
+        Vh_dim = ('event', 'rank', lower_dim)
+        Vh_out = group.createVariable('Vh', 'f', Vh_dim, zlib=True)
+        Vh_out[:] = all_Vh[:, :max_k, :]
 
 class EigenDecomposition(Decomposition):
     def __init__(self, variable: Variable):
