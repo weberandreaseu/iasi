@@ -316,7 +316,7 @@ class ErrorEstimation:
 
 
 class WaterVapour(ErrorEstimation):
-    levels_of_interest = [-16, -19]
+    levels_of_interest = [-6, -16, -19]
 
     def __init__(self, gas, nol, alt, avk, type_two=True):
         super().__init__(gas, nol, alt, type_two=type_two)
