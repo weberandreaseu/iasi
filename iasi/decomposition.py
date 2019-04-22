@@ -114,7 +114,9 @@ class EigenDecomposition(Decomposition):
         # should be always the same because reshaped variable is square
         all_Q = np.ma.masked_all((events, bound, bound))
         all_s = np.ma.masked_all((events, bound))
+        all_k = np.ma.masked_all((events))
         path = f'{group.path}/{var.name}/'
+        max_k = 0
         for event in range(var.shape[0]):
             if np.ma.is_masked(levels[event]) or levels.data[event] > 29:
                 continue
@@ -128,6 +130,8 @@ class EigenDecomposition(Decomposition):
             eigenvalues, eigenvectors = np.linalg.eig(matrix)
             most_significant = self.select_significant(eigenvalues)
             k = len(most_significant)
+            all_k[event] = k
+            max_k = max(k, max_k)
             # TODO check for imag values or symmetric property. already happend!
             try:
                 all_Q[event][:eigenvectors.shape[0], :k] = eigenvectors[:, :k]
@@ -136,9 +140,13 @@ class EigenDecomposition(Decomposition):
                 logging.error('Failed to assign values')
         # write all to output
         dimension_name, _ = q.upper_and_lower_dimension()
-        Q_dim = ('event', dimension_name, dimension_name)
-        Q_out = output.createVariable(path + '/Q', 'f', Q_dim, zlib=True)
-        Q_out[:] = all_Q[:]
-        s_dim = ('event', dimension_name)
-        s_out = output.createVariable(path + '/s', 'f', s_dim, zlib=True)
-        s_out[:] = all_s[:]
+        target_group = output.createGroup(path)
+        target_group.createDimension('rank', size=max_k)
+        k_out = target_group.createVariable('k', 'i1', ('event'))
+        k_out[:] = all_k[:]
+        Q_dim = ('event', dimension_name, 'rank')
+        Q_out = target_group.createVariable('Q', 'f', Q_dim, zlib=True)
+        Q_out[:] = all_Q[:, :, :max_k]
+        s_dim = ('event', 'rank')
+        s_out = target_group.createVariable('s', 'f', s_dim, zlib=True)
+        s_out[:] = all_s[:, :max_k]
