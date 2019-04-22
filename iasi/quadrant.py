@@ -9,32 +9,28 @@ class QuadrantException(Exception):
     pass
 
 
-# Combinations
-
-#           quadrant    shape
-# WV avk    4           (1, 2, 2, 29, 29)   (1, 58, 58)
-# WV n      4           (1, 2, 2, 29, 29)   (1, 58, 58)
-# WV xavk   2           (1, 2, 29, 29)      (1, 58, 29)
-
-# GHG avk   4           (1, 2, 2, 29, 29)   (1, 58, 58)
-# GHG n     4           (1, 2, 2, 29, 29)   (1, 58, 58)
-# GHG xavk  2           (1, 2, 29, 29)      (1, 58, 29)
-
-# HNO3 avk  1           (1, 29, 29)         (1, 29, 29)
-# HNO3 n    1           (1, 29, 29)         (1, 29, 29)
-# HNO3 xavk 1           (1, 29, 29)         (1, 29, 29)
-
-# Tatm avk  1           (1, 29, 29)         (1, 29, 29)
-# Tatm n    1           (1, 29, 29)         (1, 29, 29)
-
 class Quadrant:
+    """Transformation of matrices for decomposition and compositions
 
+    Gas var   quadrant    shape
+    WV avk    4           (1, 2, 2, 29, 29)   (1, 58, 58)
+    WV n      4           (1, 2, 2, 29, 29)   (1, 58, 58)
+    WV xavk   2           (1, 2, 29, 29)      (1, 58, 29)
+
+    GHG avk   4           (1, 2, 2, 29, 29)   (1, 58, 58)
+    GHG n     4           (1, 2, 2, 29, 29)   (1, 58, 58)
+    GHG cave  2           (1, 2, 29, 29)      (1, 58, 29)
+
+    HNO3 avk  1           (1, 29, 29)         (1, 29, 29)
+    HNO3 n    1           (1, 29, 29)         (1, 29, 29)
+    HNO3 xavk 1           (1, 29, 29)         (1, 29, 29)
+
+    Tatm avk  1           (1, 29, 29)         (1, 29, 29)
+    Tatm n    1           (1, 29, 29)         (1, 29, 29)
+    """
     @classmethod
     def for_assembly(cls, gas: str,  var_name: str, var: Variable):
-        try:
-            assert var_name in ['avk', 'n', 'Tatmxavk']
-        except AssertionError:
-            print(var_name)
+        assert var_name in ['avk', 'n', 'Tatmxavk']
         dimensions = dimensions_of(var)
         events = dimensions['event']
         levels = dimensions['atmospheric_grid_levels']
@@ -88,11 +84,11 @@ class Quadrant:
     def upper_and_lower_dimension(self):
         return ('atmospheric_grid_levels', 'atmospheric_grid_levels')
 
+    def create_variable(self, dataset: Dataset, path: str) -> Variable:
+        return dataset.createVariable(path, 'f4', ('event', 'atmospheric_grid_levels', 'atmospheric_grid_levels'))
+
 
 class AssembleTwoQuadrants(Quadrant):
-
-    matches = ('event', 'atmospheric_species',
-               'atmospheric_grid_levels', 'atmospheric_grid_levels')
 
     def transform(self, array: np.ma.MaskedArray, levels: int):
         return np.block([
@@ -118,6 +114,9 @@ class DisassembleTwoQuadrants(Quadrant):
     def assign_disassembly(self, of, to, l):
         to[0, :l, :l] = of[:l, :l]
         to[1, :l, :l] = of[l:2*l, :l]
+
+    def create_variable(self, dataset: Dataset, path: str) -> Variable:
+        return dataset.createVariable(path, 'f4', ('event', 'atmospheric_species', 'atmospheric_grid_levels', 'atmospheric_grid_levels'))
 
 
 class AssembleFourQuadrants(Quadrant):
@@ -152,3 +151,6 @@ class DisassembleFourQuadrants(Quadrant):
         result[1, 0, :l, :l] = reconstructed[:l, l:2*l]
         result[0, 1, :l, :l] = reconstructed[l:2*l, :l]
         result[1, 1, :l, :l] = reconstructed[l:2*l, l:2*l]
+
+    def create_variable(self, dataset: Dataset, path: str) -> Variable:
+        return dataset.createVariable(path, 'f4', ('event', 'atmospheric_species', 'atmospheric_species', 'atmospheric_grid_levels', 'atmospheric_grid_levels'))
