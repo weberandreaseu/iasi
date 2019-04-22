@@ -51,7 +51,7 @@ class TestQuadrants(unittest.TestCase):
 
     def test_single_quadrant_assembly(self):
         avk = self.uncompressed['state/HNO3/avk']
-        q: Quadrant = Quadrant.for_assembly(avk)
+        q: Quadrant = Quadrant.for_assembly('HNO3', 'avk', avk)
         self.assertIsInstance(q, Quadrant)
         self.assertTupleEqual(q.transformed_shape(), (1, 29, 29))
         array = np.random.uniform(size=(29, 29))
@@ -61,7 +61,7 @@ class TestQuadrants(unittest.TestCase):
 
     def test_two_quadrants_assembly(self):
         xavk = self.uncompressed['state/GHG/Tatmxavk']
-        q: Quadrant = Quadrant.for_assembly(xavk)
+        q: Quadrant = Quadrant.for_assembly('GHG', xavk.name, xavk)
         self.assertIsInstance(q, AssembleTwoQuadrants)
         self.assertTupleEqual(q.transformed_shape(), (1, 58, 29))
         array = np.random.uniform(size=(2, 29, 29))
@@ -70,7 +70,7 @@ class TestQuadrants(unittest.TestCase):
 
     def test_four_quadrants_assembly(self):
         avk = self.uncompressed['/state/WV/avk']
-        q: Quadrant = Quadrant.for_assembly(avk)
+        q: Quadrant = Quadrant.for_assembly('WV', 'avk', avk)
         self.assertIsInstance(q, AssembleFourQuadrants)
         self.assertTupleEqual(q.transformed_shape(), (1, 58, 58))
         array = np.random.uniform(size=(2, 2, 29, 29))
@@ -81,7 +81,7 @@ class TestQuadrants(unittest.TestCase):
 
     def test_single_quadrant_disassembly(self):
         atm_n = self.compressed['state/HNO3/n/Q']
-        q: Quadrant = Quadrant.for_disassembly(atm_n)
+        q: Quadrant = Quadrant.for_disassembly('HNO3', 'n', atm_n)
         self.assertIsInstance(q, Quadrant)
         self.assertTupleEqual(q.transformed_shape(), (1, 29, 29))
         array = np.random.uniform(size=(29, 29))
@@ -90,7 +90,7 @@ class TestQuadrants(unittest.TestCase):
 
     def test_two_quadrant_disassembly(self):
         xavk = self.compressed['state/GHG/Tatmxavk/U']
-        q: Quadrant = Quadrant.for_disassembly(xavk)
+        q: Quadrant = Quadrant.for_disassembly('GHG', 'Tatmxavk', xavk)
         self.assertIsInstance(q, DisassembleTwoQuadrants)
         self.assertTupleEqual(q.transformed_shape(), (1, 2, 29, 29))
         array = np.arange(29*58).reshape(58, 29)
@@ -103,12 +103,12 @@ class TestQuadrants(unittest.TestCase):
 
     def test_four_quadrant_disassembly(self):
         avk_rc = self.compressed['state/WV/avk/U']
-        q: Quadrant = Quadrant.for_disassembly(avk_rc)
+        q: Quadrant = Quadrant.for_disassembly('WV', 'avk', avk_rc)
 
         self.assertIsInstance(q, DisassembleFourQuadrants)
         self.assertTupleEqual(q.transformed_shape(), (1, 2, 2, 29, 29))
         avk = self.uncompressed['state/WV/avk/']
-        q_assembly = Quadrant.for_assembly(avk)
+        q_assembly = Quadrant.for_assembly('WV', 'avk', avk)
         array = np.arange(58*58).reshape(58, 58)
         disassembly = q.transform(array, 23)
         array_rc = q_assembly.transform(disassembly, 23)

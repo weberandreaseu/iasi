@@ -123,8 +123,8 @@ class TestCopyNetcdf(unittest.TestCase):
         # output from compress dataset
         with Dataset(tasks[1].output().path, 'r') as nc:
             child_items = list(child_variables_of(nc))
-            self.assertEqual(len(child_items), 3)
+            self.assertEqual(len(child_items), 4)
             vars = [var.name for _, var in child_items]
-            self.assertListEqual(vars, ['U', 's', 'Vh'])
+            self.assertListEqual(vars, ['k', 'U', 's', 'Vh'])
             groups = [group.path for group, _ in child_items]
-            self.assertListEqual(groups, ['/state/WV/avk'] * 3)
+            self.assertListEqual(groups, ['/state/WV/avk'] * 4)

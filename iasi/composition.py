@@ -10,6 +10,7 @@ from iasi.quadrant import Quadrant
 
 logger = logging.getLogger(__name__)
 
+
 class CompositionException(Exception):
     pass
 
@@ -40,27 +41,36 @@ class SingularValueComposition(Composition):
     def __init__(self, group: Group):
         super().__init__(group)
         vars = group.variables.keys()
-        assert 'U' in vars and 's' in vars and 'Vh' in vars
+        assert 'U' in vars and 's' in vars and 'Vh' in vars and 'k' in vars
         self.U = group['U']
         self.s = group['s']
         self.Vh = group['Vh']
+        self.k = group['k']
+        self.quadrant = Quadrant.for_disassembly(
+            group.parent.name, group.name, self.U)
 
     def reconstruct(self, nol: np.ma.MaskedArray, target: Dataset = None) -> np.ma.MaskedArray:
-        q: Quadrant = Quadrant.for_disassembly(self.U)
-        result = np.ma.masked_all(q.transformed_shape(), dtype=np.float32)
+        result = np.ma.masked_all(
+            self.quadrant.transformed_shape(), dtype=np.float32)
+        k_all = self.k[...]
+        U_all = self.U[...]
+        s_all = self.s[...]
+        Vh_all = self.Vh[...]
         for event in range(self.Vh.shape[0]):
-            if np.ma.is_masked(nol[event]) or nol.data[event] > 29:
+            if np.ma.is_masked(nol[event]) or nol.data[event] > 29 or np.ma.is_masked(k_all):
                 logger.warning('Skipping event %d', event)
                 continue
             level = int(nol.data[event])
-            U = self.U[event][...]
-            s = self.s[event][...]
-            Vh = self.Vh[event][...]
+            k = k_all.data[event]
+            U = U_all.data[event, :, :k]
+            s = s_all.data[event, :k]
+            Vh = Vh_all.data[event, :k, :]
             reconstruction = (U * s).dot(Vh)
-            q.assign_disassembly(reconstruction, result[event], level)
+            self.quadrant.assign_disassembly(
+                reconstruction, result[event], level)
             # result[event] = q.disassemble(reconstruction, nol[event])
         if target:
-            self._export_reconstruction(target, result, q)
+            self._export_reconstruction(target, result, self.quadrant)
         return result
 
 
@@ -69,23 +79,30 @@ class EigenComposition(Composition):
     def __init__(self, group: Group):
         super().__init__(group)
         vars = group.variables.keys()
-        assert 'Q' in vars and 's' in vars
+        assert 'Q' in vars and 's' in vars and 'k' in vars
         self.Q = group['Q']
         self.s = group['s']
+        self.k = group['k']
+        self.quadrant = Quadrant.for_disassembly(
+            group.parent.name, group.name, self.Q)
 
     def reconstruct(self, nol: np.ma.MaskedArray, target: Dataset = None) -> np.ma.MaskedArray:
-        q: Quadrant = Quadrant.for_disassembly(self.Q)
-        result = np.ma.masked_all(q.transformed_shape(), dtype=np.float32)
+        result = np.ma.masked_all(
+            self.quadrant.transformed_shape(), dtype=np.float32)
+        Q_all = self.Q[...]
+        s_all = self.s[...]
+        k_all = self.k[...]
         for event in range(self.Q.shape[0]):
-            if np.ma.is_masked(nol[event]) or nol.data[event] > 29:
+            if np.ma.is_masked(nol[event]) or nol.data[event] > 29 or np.ma.is_masked(k_all[event]):
                 logger.warning('Skipping event %d', event)
                 continue
             level = int(nol.data[event])
-            Q = self.Q[event][...]
-            s = self.s[event][...]
+            k = k_all.data[event]
+            Q = Q_all.data[event, :, :k]
+            s = s_all.data[event, :k]
             reconstruction = (Q * s).dot(Q.T)
-            q.assign_disassembly(reconstruction, result[event], level)
-            # result[event] = q.disassemble(reconstruction, nol[event])
+            self.quadrant.assign_disassembly(
+                reconstruction, result[event], level)
         if target:
-            self._export_reconstruction(target, result, q)
+            self._export_reconstruction(target, result, self.quadrant)
         return result

@@ -4,9 +4,10 @@ from typing import List, Tuple
 import numpy as np
 from netCDF4 import Dataset, Group, Variable
 from iasi.quadrant import Quadrant
-
+from iasi.util import dimensions_of
 
 logger = logging.getLogger(__name__)
+
 
 class DecompositionException(Exception):
     pass
@@ -57,13 +58,15 @@ class SingularValueDecomposition(Decomposition):
         self.var = variable
 
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
-        q: Quadrant = Quadrant.for_assembly(var)
+        q: Quadrant = Quadrant.for_assembly(group.name, var.name, var)
         events, upper_bound, lower_bound = q.transformed_shape()
         # tranformed shape 1: (e, gl, gl), 2: (e, 2*gl, gl), 4:(e, 2* gl, 2*gl)
         all_U = np.ma.masked_all((events, upper_bound, lower_bound))
         all_s = np.ma.masked_all((events, lower_bound))
         all_Vh = np.ma.masked_all((events, lower_bound, lower_bound))
+        all_k = np.ma.masked_all((events), dtype=np.int)
         path = f'{group.path}/{var.name}/'
+        max_k = 0
         for event in range(var.shape[0]):
             if np.ma.is_masked(levels[event]) or levels.data[event] > 29:
                 continue
@@ -77,25 +80,28 @@ class SingularValueDecomposition(Decomposition):
             # find k eigenvalues
             sigma = self.select_significant(s)
             k = len(sigma)
+            max_k = max(k, max_k)
             # assign sliced decomposition to all
-            try:
-                all_U[event][:U.shape[0], :k] = U[:, :k]
-                all_s[event][:k] = sigma
-                all_Vh[event][:k, :Vh.shape[1]] = Vh[:k, :]
-            except ValueError as error:
-                print(error)
+            all_k[event] = k
+            all_U[event][:U.shape[0], :k] = U[:, :k]
+            all_s[event][:k] = sigma
+            all_Vh[event][:k, :Vh.shape[1]] = Vh[:k, :]
         # write all to output
         upper_dim, lower_dim = q.upper_and_lower_dimension()
+        group = output.createGroup(path)
+        group.createDimension('rank', size=max_k)
         # TODO add group description
-        U_dim = ('event', upper_dim, lower_dim)
-        U_out = output.createVariable(path + 'U', 'f', U_dim, zlib=True)
-        U_out[:] = all_U[:]
-        s_dim = ('event', lower_dim)
-        s_out = output.createVariable(path + 's', 'f', s_dim, zlib=True)
-        s_out[:] = all_s[:]
-        Vh_dim = ('event', lower_dim, lower_dim)
-        Vh_out = output.createVariable(path + 'Vh', 'f', Vh_dim, zlib=True)
-        Vh_out[:] = all_Vh[:]
+        k_out = group.createVariable('k', 'i1', ('event'))
+        k_out[:] = all_k[:]
+        U_dim = ('event', upper_dim, 'rank')
+        U_out = group.createVariable('U', 'f', U_dim, zlib=True)
+        U_out[:] = all_U[:, :, :max_k]
+        s_dim = ('event', 'rank')
+        s_out = group.createVariable('s', 'f', s_dim, zlib=True)
+        s_out[:] = all_s[:, :max_k]
+        Vh_dim = ('event', 'rank', lower_dim)
+        Vh_out = group.createVariable('Vh', 'f', Vh_dim, zlib=True)
+        Vh_out[:] = all_Vh[:, :max_k, :]
 
 
 class EigenDecomposition(Decomposition):
@@ -103,12 +109,14 @@ class EigenDecomposition(Decomposition):
         self.var = variable
 
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
-        q: Quadrant = Quadrant.for_assembly(var)
+        q: Quadrant = Quadrant.for_assembly(group.name, var.name, var)
         events, _, bound = q.transformed_shape()
         # should be always the same because reshaped variable is square
         all_Q = np.ma.masked_all((events, bound, bound))
         all_s = np.ma.masked_all((events, bound))
+        all_k = np.ma.masked_all((events))
         path = f'{group.path}/{var.name}/'
+        max_k = 0
         for event in range(var.shape[0]):
             if np.ma.is_masked(levels[event]) or levels.data[event] > 29:
                 continue
@@ -122,6 +130,8 @@ class EigenDecomposition(Decomposition):
             eigenvalues, eigenvectors = np.linalg.eig(matrix)
             most_significant = self.select_significant(eigenvalues)
             k = len(most_significant)
+            all_k[event] = k
+            max_k = max(k, max_k)
             # TODO check for imag values or symmetric property. already happend!
             try:
                 all_Q[event][:eigenvectors.shape[0], :k] = eigenvectors[:, :k]
@@ -130,9 +140,13 @@ class EigenDecomposition(Decomposition):
                 logging.error('Failed to assign values')
         # write all to output
         dimension_name, _ = q.upper_and_lower_dimension()
-        Q_dim = ('event', dimension_name, dimension_name)
-        Q_out = output.createVariable(path + '/Q', 'f', Q_dim, zlib=True)
-        Q_out[:] = all_Q[:]
-        s_dim = ('event', dimension_name)
-        s_out = output.createVariable(path + '/s', 'f', s_dim, zlib=True)
-        s_out[:] = all_s[:]
+        target_group = output.createGroup(path)
+        target_group.createDimension('rank', size=max_k)
+        k_out = target_group.createVariable('k', 'i1', ('event'))
+        k_out[:] = all_k[:]
+        Q_dim = ('event', dimension_name, 'rank')
+        Q_out = target_group.createVariable('Q', 'f', Q_dim, zlib=True)
+        Q_out[:] = all_Q[:, :, :max_k]
+        s_dim = ('event', 'rank')
+        s_out = target_group.createVariable('s', 'f', s_dim, zlib=True)
+        s_out[:] = all_s[:, :max_k]

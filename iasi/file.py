@@ -7,7 +7,7 @@ from luigi.util import common_params, inherits, requires
 # from iasi.compression import CompressDataset
 from netCDF4 import Dataset, Variable, Group
 
-from iasi.util import CustomTask, child_variables_of
+from iasi.util import CustomTask, child_variables_of, child_groups_of
 import logging
 
 logger = logging.getLogger(__name__)
@@ -90,10 +90,19 @@ class CopyNetcdfFile(CustomTask):
             input.close()
             output.close()
 
-    def copy_dimensions(self, input: Dataset, output: Dataset) -> None:
-        for name, dim in input.dimensions.items():
-            output.createDimension(
-                name, len(dim) if not dim.isunlimited() else None)
+    def copy_dimensions(self, input: Dataset, output: Dataset, recursive=True) -> None:
+        # find recursively all dimensions of input including subgroups
+        if recursive:
+            for group in child_groups_of(input):
+                target_group = output.createGroup(group.path)
+                for name, dim in group.dimensions.items():
+                    target_group.createDimension(
+                        name, len(dim) if not dim.isunlimited() else None)
+        # create only dimensions in root 
+        else:
+            for name, dim in input.dimensions.items():
+                output.createDimension(
+                    name, len(dim) if not dim.isunlimited() else None)
 
     def copy_variable(self,  target: Dataset, var: Variable, path: str = None, compressed: bool = False) -> Variable:
         if path:
