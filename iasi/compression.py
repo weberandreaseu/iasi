@@ -155,11 +155,7 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
             attribute = input[var_path]
             if isinstance(attribute, Group):
                 for var in attribute.variables.values():
-                    compressed = self.ancestor == 'CompressDataset'
-                    self.copy_variable(
-                        output, var, f'{attribute.path}/{var.name}', compressed=compressed)
+                    self.copy_variable(output, var, f'{attribute.path}/{var.name}', compressed=True)
             else:
                 assert isinstance(attribute, Variable)
-                compressed = self.ancestor == 'CompressDataset'
-                self.copy_variable(output, attribute, var_path,
-                                   compressed=compressed)
+                self.copy_variable(output, attribute, var_path, compressed=True)
