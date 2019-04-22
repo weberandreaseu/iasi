@@ -42,7 +42,7 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
         input = Dataset(self.input().path)
         with self.output().temporary_path() as target:
             output = Dataset(target, 'w', format=self.format)
-            self.copy_dimensions(input, output)
+            self.copy_dimensions(input, output, recursive=False)
             self.copy_variables(input, output)
             levels = input['atm_nol'][...]
             dim_levels = input.dimensions['atmospheric_grid_levels'].size
@@ -87,7 +87,7 @@ class DecompressDataset(CompressionParams, CopyNetcdfFile):
         input = Dataset(self.input().path)
         with self.output().temporary_path() as target:
             output = Dataset(target, 'w', format=self.format)
-            self.copy_dimensions(input, output)
+            self.copy_dimensions(input, output, recursive=False)
             self.copy_variables(input, output)
             levels = input['atm_nol'][...]
             groups = list(child_groups_of(input['state']))

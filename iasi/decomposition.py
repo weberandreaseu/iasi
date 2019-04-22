@@ -4,7 +4,7 @@ from typing import List, Tuple
 import numpy as np
 from netCDF4 import Dataset, Group, Variable
 from iasi.quadrant import Quadrant
-
+from iasi.util import dimensions_of
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class SingularValueDecomposition(Decomposition):
         self.var = variable
 
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
-        q: Quadrant = Quadrant.for_assembly(var)
+        q: Quadrant = Quadrant.for_assembly(group.name, var.name, var)
         events, upper_bound, lower_bound = q.transformed_shape()
         # tranformed shape 1: (e, gl, gl), 2: (e, 2*gl, gl), 4:(e, 2* gl, 2*gl)
         all_U = np.ma.masked_all((events, upper_bound, lower_bound))
@@ -103,12 +103,13 @@ class SingularValueDecomposition(Decomposition):
         Vh_out = group.createVariable('Vh', 'f', Vh_dim, zlib=True)
         Vh_out[:] = all_Vh[:, :max_k, :]
 
+
 class EigenDecomposition(Decomposition):
     def __init__(self, variable: Variable):
         self.var = variable
 
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
-        q: Quadrant = Quadrant.for_assembly(var)
+        q: Quadrant = Quadrant.for_assembly(group.name, var.name, var)
         events, _, bound = q.transformed_shape()
         # should be always the same because reshaped variable is square
         all_Q = np.ma.masked_all((events, bound, bound))

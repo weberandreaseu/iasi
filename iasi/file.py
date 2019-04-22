@@ -90,12 +90,18 @@ class CopyNetcdfFile(CustomTask):
             input.close()
             output.close()
 
-    def copy_dimensions(self, input: Dataset, output: Dataset) -> None:
+    def copy_dimensions(self, input: Dataset, output: Dataset, recursive=True) -> None:
         # find recursively all dimensions of input including subgroups
-        for group in child_groups_of(input):
-            target_group = output.createGroup(group.path)
-            for name, dim in group.dimensions.items():
-                target_group.createDimension(
+        if recursive:
+            for group in child_groups_of(input):
+                target_group = output.createGroup(group.path)
+                for name, dim in group.dimensions.items():
+                    target_group.createDimension(
+                        name, len(dim) if not dim.isunlimited() else None)
+        # create only dimensions in root 
+        else:
+            for name, dim in input.dimensions.items():
+                output.createDimension(
                     name, len(dim) if not dim.isunlimited() else None)
 
     def copy_variable(self,  target: Dataset, var: Variable, path: str = None, compressed: bool = False) -> Variable:

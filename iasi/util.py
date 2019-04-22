@@ -12,6 +12,10 @@ import iasi
 logger = logging.getLogger(__name__)
 
 
+def dimensions_of(variable: Variable):
+    return {name: dim for name, dim in zip(variable.dimensions, variable.shape)}
+
+
 def child_groups_of(group: Group):
     yield group
     if group.groups:

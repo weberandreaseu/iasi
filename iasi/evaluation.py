@@ -207,20 +207,21 @@ class ErrorEstimation:
     @staticmethod
     def factory(gas: str, nol, alt, avk):
         if gas == 'WV':
-            return WaterVapour(nol, alt, avk, type_two=True)
+            return WaterVapour(gas, nol, alt, avk, type_two=True)
         if gas == 'GHG':
-            return GreenhouseGas(nol, alt)
+            return GreenhouseGas(gas, nol, alt)
         if gas == 'HNO3':
-            return NitridAcid(nol, alt)
+            return NitridAcid(gas, nol, alt)
         if gas == 'Tatm':
-            return AtmosphericTemperature(nol, alt)
+            return AtmosphericTemperature(gas, nol, alt)
         raise ValueError(f'No error estimation implementation for gas {gas}')
 
-    def __init__(self, nol, alt, type_two=False):
+    def __init__(self, gas, nol, alt, type_two=False):
         # each gas may have multiple levels of interest
         self.type_two = type_two
         self.nol = nol
         self.alt = alt
+        self.gas = gas
 
     def report_for(self, variable: Variable, original, reconstructed, rc_error) -> pd.DataFrame:
         # if not original.shape == reconstructed.shape:
@@ -244,7 +245,7 @@ class ErrorEstimation:
             raise ValueError(
                 f'No error estimation method for variable {variable.name}')
 
-        reshaper = Quadrant.for_assembly(variable)
+        reshaper = Quadrant.for_assembly(self.gas, variable.name, variable)
         for event in range(original.shape[0]):
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
@@ -262,8 +263,7 @@ class ErrorEstimation:
             else:
                 rc_event = None
             if isinstance(self, WaterVapour):
-                avk_event = AssembleFourQuadrants().transform(
-                    self.avk[event], nol_event)
+                avk_event = AssembleFourQuadrants(nol_event).transform(self.avk[event], nol_event)
                 if avk_event.mask.any():
                     logger.warn('Original avk contains masked values')
                 avk_event = avk_event.data
@@ -304,8 +304,8 @@ class ErrorEstimation:
 class WaterVapour(ErrorEstimation):
     levels_of_interest = [-16, -19]
 
-    def __init__(self, nol, alt, avk, type_two=True):
-        super().__init__(nol, alt, type_two=type_two)
+    def __init__(self, gas, nol, alt, avk, type_two=True):
+        super().__init__(gas, nol, alt, type_two=type_two)
         self.avk = avk
 
     # for each method type one and type two
