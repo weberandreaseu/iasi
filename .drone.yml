@@ -3,20 +3,19 @@ name: default
 
 steps:
 - name: test
-  image: jupyter/scipy-notebook
+  image: conda/miniconda3
   pull: always
   commands:
-  - pip install -r requirements.txt
-  - python -m unittest discover -v -s ./test
+  - /bin/bash script/setup.sh
+  - "bash -c \"source activate iasi && exec python -m unittest discover -v -s ./test\""
 - name: integration test
-  image: jupyter/scipy-notebook
-  pull: always
+  image: conda/miniconda3
   volumes:
     - name: data
       path: /tmp/data
   commands:
-  - pip install -r requirements.txt
   - /bin/bash script/setup.sh
+  - "bash -c \"source activate iasi && exec python -m unittest discover -s ./test -p 'integration*.py'\""
   - python -m unittest discover -s ./test -p "integration*.py"
 
 volumes:

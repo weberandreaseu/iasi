@@ -1,8 +1,7 @@
 #!/bin/bash
-
-set -x
-pwd
-whoami
-ls -lah
-ls -lah /tmp
-ls -lah /tmp/data
+# update conda
+conda update -n base -c defaults conda
+# create conda environment
+conda env create -f environment.yml
+# activate conda environment
+echo "source activate iasi" > ~/.bashrc
