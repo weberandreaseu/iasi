@@ -1,18 +1,15 @@
 FROM conda/miniconda3
 
-# update conda
-RUN conda update -n base -c defaults conda
+WORKDIR /iasi
 
 # add environment
-ADD environment.yml /tmp/environment.yml
+ADD environment.yml /iasi/environment.yml
 
-# create virutal environment
-RUN conda env create -f /tmp/environment.yml
+# add setup script
+ADD script/setup.sh /iasi/script/setup.sh
 
-# activate environment
-RUN echo "source activate iasi" > ~/.bashrc
+# run setup secipt
+RUN /bin/bash script/setup.sh
 
 # add binaries to path
 ENV PATH /opt/conda/envs/iasi/bin:$PATH
-
-WORKDIR /iasi
