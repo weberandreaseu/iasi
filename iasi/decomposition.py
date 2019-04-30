@@ -32,9 +32,12 @@ class Decomposition:
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
         raise NotImplementedError
 
-    def select_significant(self, eigenvalues: List) -> List:
-        most_significant = eigenvalues[0]
-        return list(filter(lambda eig: eig > most_significant * self.threshold, eigenvalues))
+    def target_rank(self, eigenvalues: List) -> int:
+        most_significant = abs(eigenvalues[0])
+        for k, eigenvalue in enumerate(np.abs(eigenvalues)):
+            if eigenvalue < most_significant * self.threshold:
+                return k
+        return len(eigenvalues)
 
     def matrix_ok(self, event, path, matrix):
         ok = True
@@ -78,8 +81,8 @@ class SingularValueDecomposition(Decomposition):
             # decompose reduced array
             U, s, Vh = np.linalg.svd(matrix.data, full_matrices=False)
             # find k eigenvalues
-            sigma = self.select_significant(s)
-            k = len(sigma)
+            k = self.target_rank(s)
+            sigma = s[:k]
             max_k = max(k, max_k)
             # assign sliced decomposition to all
             all_k[event] = k
@@ -123,21 +126,22 @@ class EigenDecomposition(Decomposition):
             level = int(levels.data[event])
             # reduce array dimensions
             matrix = q.transform(var[event][...], level)
-            # decompose reduced array
             if not self.matrix_ok(event, path, matrix):
                 continue
-            # TODO: use np.linalg.eigh for square matrices (probably more performant)
+            # test if symmetric
+            assert np.allclose(matrix, matrix.T)
+            # decompose reduced array
             eigenvalues, eigenvectors = np.linalg.eig(matrix)
-            most_significant = self.select_significant(eigenvalues)
-            k = len(most_significant)
+            if np.iscomplex(eigenvalues).any():
+                raise ValueError('Eigenvalues are complex')
+            if np.iscomplex(eigenvectors).any():
+                raise ValueError('Eigenvectors are complex')
+            k = self.target_rank(eigenvalues)
+            most_significant = eigenvalues[:k]
             all_k[event] = k
             max_k = max(k, max_k)
-            # TODO check for imag values or symmetric property. already happend!
-            try:
-                all_Q[event][:eigenvectors.shape[0], :k] = eigenvectors[:, :k]
-                all_s[event][:k] = most_significant
-            except ValueError as error:
-                logging.error('Failed to assign values')
+            all_Q[event][:eigenvectors.shape[0], :k] = eigenvectors[:, :k]
+            all_s[event][:k] = most_significant
         # write all to output
         dimension_name, _ = q.upper_and_lower_dimension()
         target_group = output.createGroup(path)
