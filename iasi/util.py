@@ -29,6 +29,13 @@ def child_variables_of(group: Group):
             yield (subgroup, variable)
 
 
+def root_group_of(group: Group) -> Group:
+    if group.parent:
+        return root_group_of(group.parent)
+    else:
+        return group
+
+
 class custom(luigi.Config):
     tracking_url = luigi.Parameter(default='http://localhost:8082')
 
