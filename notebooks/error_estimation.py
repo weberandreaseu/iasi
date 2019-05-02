@@ -40,7 +40,11 @@ def import_data(path_pattern: str) -> pd.DataFrame:
     frames = []
     for file in glob.glob(path_pattern):
         frame = pd.read_csv(file, index_col=None, header=0)
+        # filter to gas and variables
+        if gas and var:
+            frame = frame[(frame['gas'] == gas) & (frame['var'] == var)]
         frames.append(frame)
+        
     return pd.concat(frames, axis=0, ignore_index=True)
 
 

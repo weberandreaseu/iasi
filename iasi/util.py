@@ -110,7 +110,10 @@ class CustomTask(luigi.Task):
         if ext:
             name, _ = os.path.splitext(filename)
             filename = f'{name}.{ext}'
-        return os.path.join(self.dst, *args, filename)
+        path = os.path.join(self.dst, *args)
+        if not os.path.exists(path):
+            os.mkdir(path)
+        return os.path.join(path, filename)
 
     def create_local_target(self, *args: str, file: str, ext: str = None) -> luigi.LocalTarget:
         _, filename = os.path.split(file)
