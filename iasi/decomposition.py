@@ -140,10 +140,12 @@ class EigenDecomposition(Decomposition):
             matrix = q.transform(var[event][...], level)
             if not self.matrix_ok(event, path, matrix):
                 continue
-            # test if symmetric
+            # test if nearlly symmetric
             if not np.allclose(matrix, matrix.T):
                 raise ValueError(
                     f'Noise matrix is not symmeric for {path}:{event}')
+            # make matrix symmetric by fixing rounding errors
+            matrix = (matrix + matrix.T) / 2
             # decompose reduced array
             eigenvalues, eigenvectors = np.linalg.eig(matrix)
             if np.iscomplex(eigenvalues).any():
