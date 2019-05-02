@@ -80,6 +80,14 @@ class SingularValueDecomposition(Decomposition):
                 continue
             # decompose reduced array
             U, s, Vh = np.linalg.svd(matrix.data, full_matrices=False)
+            if np.iscomplex(U).any():
+                raise ValueError(
+                    f'Left-singuar values are complex for {path}:{event}')
+            if np.iscomplex(s).any():
+                raise ValueError(f'Eigenvalues are complex for {path}:{event}')
+            if np.iscomplex(Vh).any():
+                raise ValueError(
+                    f'Right-singlar values are complex for {path}:{event}')
             # find k eigenvalues
             k = self.target_rank(s)
             sigma = s[:k]
@@ -133,13 +141,16 @@ class EigenDecomposition(Decomposition):
             if not self.matrix_ok(event, path, matrix):
                 continue
             # test if symmetric
-            assert np.allclose(matrix, matrix.T)
+            if not np.allclose(matrix, matrix.T):
+                raise ValueError(
+                    f'Noise matrix is not symmeric for {path}:{event}')
             # decompose reduced array
             eigenvalues, eigenvectors = np.linalg.eig(matrix)
             if np.iscomplex(eigenvalues).any():
-                raise ValueError('Eigenvalues are complex')
+                raise ValueError(f'Eigenvalues are complex for {path}:{event}')
             if np.iscomplex(eigenvectors).any():
-                raise ValueError('Eigenvectors are complex')
+                raise ValueError(
+                    f'Eigenvectors are complex for {path}:{event}')
             k = self.target_rank(eigenvalues)
             most_significant = eigenvalues[:k]
             all_k[event] = k
