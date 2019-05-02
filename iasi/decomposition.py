@@ -93,18 +93,22 @@ class SingularValueDecomposition(Decomposition):
         upper_dim, lower_dim = q.upper_and_lower_dimension()
         group = output.createGroup(path)
         group.createDimension('rank', size=max_k)
-        # TODO add group description
+        group.description = f'singular value decomposistion of {var.description}. reconstruction with (U * s).dot(Vh)'
         k_out = group.createVariable('k', 'i1', ('event'))
         k_out[:] = all_k[:]
+        k_out.description = 'target rank of decomposition (number of eigenvalues)'
         U_dim = ('event', upper_dim, 'rank')
         U_out = group.createVariable('U', 'f', U_dim, zlib=True)
         U_out[:] = all_U[:, :, :max_k]
+        U_out = 'left-singular vectors of decompositon'
         s_dim = ('event', 'rank')
         s_out = group.createVariable('s', 'f', s_dim, zlib=True)
         s_out[:] = all_s[:, :max_k]
+        s_out.description = 'eigenvalues of decomposition'
         Vh_dim = ('event', 'rank', lower_dim)
         Vh_out = group.createVariable('Vh', 'f', Vh_dim, zlib=True)
         Vh_out[:] = all_Vh[:, :max_k, :]
+        Vh_out.description = 'transposed right-singular vectors of decompositon'
 
 
 class EigenDecomposition(Decomposition):
@@ -146,11 +150,15 @@ class EigenDecomposition(Decomposition):
         dimension_name, _ = q.upper_and_lower_dimension()
         target_group = output.createGroup(path)
         target_group.createDimension('rank', size=max_k)
+        target_group.description = f'eigen decomposition of {var.description}. reconstruction with (Q * s).dot(Q.T)'
         k_out = target_group.createVariable('k', 'i1', ('event'))
         k_out[:] = all_k[:]
+        k_out.description = 'target rank of decomposition (number of eigenvalues)'
         Q_dim = ('event', dimension_name, 'rank')
         Q_out = target_group.createVariable('Q', 'f', Q_dim, zlib=True)
         Q_out[:] = all_Q[:, :, :max_k]
+        Q_out.description = 'eigenvectors of noise matrix'
         s_dim = ('event', 'rank')
         s_out = target_group.createVariable('s', 'f', s_dim, zlib=True)
         s_out[:] = all_s[:, :max_k]
+        s_out.description = 'eigenvalues of noise matrix'

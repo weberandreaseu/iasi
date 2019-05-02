@@ -42,6 +42,7 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
         input = Dataset(self.input().path)
         with self.output().temporary_path() as target:
             output = Dataset(target, 'w', format=self.format)
+            output.compression_threshold = self.threshold
             self.copy_dimensions(input, output, recursive=False)
             self.copy_variables(input, output)
             levels = input['atm_nol'][...]
