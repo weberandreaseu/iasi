@@ -3,7 +3,7 @@ import unittest
 import luigi
 import numpy as np
 from netCDF4 import Dataset
-from iasi import CompressDataset, DecompressDataset
+from iasi.compression import CompressDataset, DecompressDataset
 
 
 class TestCompression(unittest.TestCase):

@@ -2,17 +2,17 @@ import logging
 import os
 import sys
 import unittest
-from typing import Tuple
-
 import warnings
-
+from typing import Tuple
 
 import luigi
 import numpy as np
 from netCDF4 import Dataset, Group, Variable
 
-from iasi import Composition, CompressDataset, MoveVariables
-from iasi.composition import EigenComposition, SingularValueComposition
+from iasi.composition import (Composition, EigenComposition,
+                              SingularValueComposition)
+from iasi.compression import CompressDataset
+from iasi.file import MoveVariables
 
 # TODO project wide logging configuration
 handler = logging.StreamHandler(stream=sys.stdout)
@@ -71,7 +71,8 @@ class TestComposition(unittest.TestCase):
         ), 'Reconstructed array contains nans')
         self.assertFalse(np.isinf(reconstruction[:, :28, :28]).any(
         ), 'Reconstructed array contains inf')
-        close = np.allclose(reconstruction.compressed(), original.compressed(), atol=1.e-4)
+        close = np.allclose(reconstruction.compressed(),
+                            original.compressed(), atol=1.e-4)
         self.assertTrue(close, 'Eigen composition is not close to original')
         self.assertTrue(self.masks_equal(reconstruction, original))
 
@@ -101,6 +102,7 @@ class TestComposition(unittest.TestCase):
         ), 'Reconstructed array contains nans')
         self.assertFalse(np.isinf(reconstruction[:, :28, :28]).any(
         ), 'Reconstructed array contains inf')
-        close = np.allclose(reconstruction.compressed(), original.compressed(), atol=2.e-4)
+        close = np.allclose(reconstruction.compressed(),
+                            original.compressed(), atol=2.e-4)
         self.assertTrue(close, 'Reconstructed data for SVD is not close')
         self.assertTrue(self.masks_equal(reconstruction, original))
