@@ -141,24 +141,35 @@ class EigenDecomposition(Decomposition):
             if not self.matrix_ok(event, path, matrix):
                 continue
             # test if nearlly symmetric
+            matrix = matrix.data
             if not np.allclose(matrix, matrix.T):
-                raise ValueError(
-                    f'Noise matrix is not symmeric for {path}:{event}')
+                raise ValueError(f'Noise matrix is not symmeric for {path}:{event}')
             # make matrix symmetric by fixing rounding errors
             matrix = (matrix + matrix.T) / 2
-            # decompose reduced array
+            # decompose matrix
             eigenvalues, eigenvectors = np.linalg.eig(matrix)
+            # should not be complex anymore because matrix is symmetric (see above)
             if np.iscomplex(eigenvalues).any():
                 raise ValueError(f'Eigenvalues are complex for {path}:{event}')
             if np.iscomplex(eigenvectors).any():
-                raise ValueError(
-                    f'Eigenvectors are complex for {path}:{event}')
-            k = self.target_rank(eigenvalues)
-            most_significant = eigenvalues[:k]
-            all_k[event] = k
+                raise ValueError(f'Eigenvectors are complex for {path}:{event}')
+            # covarinace maticies are postive semi definite
+            # this implies that eigenvalues are positive
+            # unfortuenately, due to floating point errors this is not garantueed 
+            # to address this problem we assume negative eigenpairs as negligible and filter them
+            selected_eigenvalues = []
+            selected_eigenvectors = []
+            max_eigenvalue = eigenvalues.max()
+            for value, vector in zip(eigenvalues, eigenvectors.T):
+                if value > 0 and (max_eigenvalue * self.threshold < value):
+                    selected_eigenvalues.append(value)
+                    selected_eigenvectors.append(vector)
+            k = len(selected_eigenvalues)
             max_k = max(k, max_k)
-            all_Q[event][:eigenvectors.shape[0], :k] = eigenvectors[:, :k]
-            all_s[event][:k] = most_significant
+            selected_eigenvectors = np.array(selected_eigenvectors).T
+            all_k[event] = k
+            all_Q[event][:selected_eigenvectors.shape[0], :k] = selected_eigenvectors[:, :k]
+            all_s[event][:k] = selected_eigenvalues
         # write all to output
         dimension_name, _ = q.upper_and_lower_dimension()
         target_group = output.createGroup(path)
