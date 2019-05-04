@@ -9,36 +9,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from matplotlib.ticker import FormatStrFormatter, StrMethodFormatter
-
 from iasi.evaluation import EvaluationErrorEstimation
 
-# task = EvaluationErrorEstimation(
-#     force_upstream=True,
-#     dst='data',
-#     file='data/input/MOTIV-slice-100.nc',
-#     # file='test/resources/MOTIV-single-event.nc',
-#     gases=['WV', 'GHG', 'HNO3', 'Tatm'],
-#     variables=['avk', 'n', 'Tatmxavk'],
-#     thresholds=[1e-2, 1e-3, 1e-4, 1e-5]
-# )
-
-# assert luigi.build([task], local_scheduler=True)
-
-# types = {'event': np.int, 'level_of_interest': np.int, 'err': np.float,
-#          type: np.int, 'rc_error': bool, 'threshold': np.float, 'var': str, 'gas': str}
-
-# with task.output().open() as file:
-#     df = pd.read_csv(file, dtype=types)
-#     wv = df[df['gas'] == 'WV']
-#     ghg = df[df['gas'] == 'GHG']
-#     hno3 = df[df['gas'] == 'HNO3']
-#     tatm = df[df['gas'] == 'Tatm']
-
-# %%
-
-
-thresholds = [1e-5, 1e-4, 1e-3, 1e-4, 1]
+thresholds = [1e-5, 1e-4, 1e-3, 1e-2, 1]
 
 
 def import_data(path_pattern: str, gas: str = None, var: str = None) -> pd.DataFrame:
@@ -62,7 +35,8 @@ err_winter = import_data(
 # %%
 # err_summer = import_data('data/scc/error-estimation/METOP*_20160801*.csv')
 # %%
-size_winter = import_data('data/scc/compression-size/METOP*_20160201*.csv')
+size_winter = import_data(
+    'data/motiv/compression-summary/METOP*_20160201*.csv')
 # %%
 # size_summer = import_data('data/scc/compression-size/METOP*_20160801*.csv')
 
@@ -88,9 +62,10 @@ def plot_error_estimation_for(df, gas: str, var: str, level_of_interest: int):
     mean_error = filter_by(df, gas, var, level_of_interest, False)[
         'err'].mean()
     # set ylim to make line for cov error visible
-    plt.gca().xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
     ax.set_ylim(top=mean_error * 5)
     ax.axhline(mean_error, color='red', label='Error')
+    ax.invert_xaxis()
+    plt.xticks(np.arange(5), map(lambda t: f'{t:.0e}', thresholds))
     ax.set_ylabel('Reconstruction error')
     ax.set_xlabel('Threshold for eigenvalue selection')
     plt.title(f'Error estimation for {gas} {var} at {level_of_interest}')
@@ -103,20 +78,22 @@ def plot_levels(df: pd.DataFrame, gas: str, var: str, type):
         (df['var'] == var) &
         (df['type'] == type)
     ].groupby(['threshold', 'level_of_interest']).mean()['err'].unstack().plot.bar(logy=True, rot=0)
-    ax.get_xaxis.set_major_formatter(FormatStrFormatter('%.0e'))
-    ax.set_xticklabels(thresholds)
+    ax.invert_xaxis()
+    plt.xticks(np.arange(5), map(lambda t: f'{t:.0e}', thresholds))
     plt.title(f'Error estimation for {gas} {var} type {type}')
     plt.show()
 
 
 def plot_types(df: pd.DataFrame, gas: str, var: str, level_of_interest: int):
-    df[
+    ax = df[
         (df['gas'] == gas) &
         (df['var'] == var) &
         (df['level_of_interest'] == level_of_interest)
     ].groupby(['threshold', 'type']).mean()['err'].unstack().plot.bar(logy=True, rot=0)
     plt.title(
         f'Error estimation {gas} {var} with level of interest {level_of_interest}')
+    ax.invert_xaxis()
+    plt.xticks(np.arange(5), map(lambda t: f'{t:.0e}', thresholds))
     plt.show()
 
 
@@ -135,11 +112,13 @@ def plot_size_for(df: pd.DataFrame, gas: str, var: str):
         'size'].plot.bar(rot=0, legend=False)
     original_mean = original['size'].mean()
     ax.axhline(original_mean, color='red')
-    ax.text(0, original_mean * 0.94, 'Original mean size',
-            horizontalalignment='center')
+    ax.invert_xaxis()
     # ax.legend(loc='upper left')
-    ax.set_ylabel('Average file size in kB')
+    ax.text(2.8, original_mean * 1.05, 'Mean original size',
+            horizontalalignment='center')
+    ax.set_ylabel('Mean size in kB')
     ax.set_xlabel('Threshold for eigenvalue selection')
+    plt.xticks(np.arange(4), map(lambda t: f'{t:.0e}', thresholds))
     plt.title(f'Data size reduction for {gas} {var}')
     plt.show()
 
