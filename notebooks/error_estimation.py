@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from matplotlib.ticker import FormatStrFormatter, StrMethodFormatter
+
 from iasi.evaluation import EvaluationErrorEstimation
 
 # task = EvaluationErrorEstimation(
@@ -36,20 +38,27 @@ from iasi.evaluation import EvaluationErrorEstimation
 # %%
 
 
-def import_data(path_pattern: str) -> pd.DataFrame:
+thresholds = [1e-5, 1e-4, 1e-3, 1e-4, 1]
+
+
+def import_data(path_pattern: str, gas: str = None, var: str = None) -> pd.DataFrame:
     frames = []
     for file in glob.glob(path_pattern):
         frame = pd.read_csv(file, index_col=None, header=0)
         # filter to gas and variables
-        if gas and var:
-            frame = frame[(frame['gas'] == gas) & (frame['var'] == var)]
+        if gas:
+            frame = frame[frame['gas'] == gas]
+        if var:
+            frame = frame[frame['var'] == var]
+        frame['threshold'].replace(0, 1, inplace=True)
         frames.append(frame)
-        
+
     return pd.concat(frames, axis=0, ignore_index=True)
 
 
 # %%
-err_winter = import_data('data/scc/error-estimation/METOP*_20160201*.csv')
+err_winter = import_data(
+    'data/motiv/error-estimation/METOPA_20160201001156_48180_20190323165817.csv', gas='WV')
 # %%
 # err_summer = import_data('data/scc/error-estimation/METOP*_20160801*.csv')
 # %%
@@ -58,7 +67,7 @@ size_winter = import_data('data/scc/compression-size/METOP*_20160201*.csv')
 # size_summer = import_data('data/scc/compression-size/METOP*_20160801*.csv')
 
 # %% [markdown]
-## Season: Winter
+# Season: Winter
 
 # %%
 err_season = err_winter
@@ -79,6 +88,7 @@ def plot_error_estimation_for(df, gas: str, var: str, level_of_interest: int):
     mean_error = filter_by(df, gas, var, level_of_interest, False)[
         'err'].mean()
     # set ylim to make line for cov error visible
+    plt.gca().xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
     ax.set_ylim(top=mean_error * 5)
     ax.axhline(mean_error, color='red', label='Error')
     ax.set_ylabel('Reconstruction error')
@@ -88,11 +98,13 @@ def plot_error_estimation_for(df, gas: str, var: str, level_of_interest: int):
 
 
 def plot_levels(df: pd.DataFrame, gas: str, var: str, type):
-    df[
+    ax = df[
         (df['gas'] == gas) &
         (df['var'] == var) &
         (df['type'] == type)
     ].groupby(['threshold', 'level_of_interest']).mean()['err'].unstack().plot.bar(logy=True, rot=0)
+    ax.get_xaxis.set_major_formatter(FormatStrFormatter('%.0e'))
+    ax.set_xticklabels(thresholds)
     plt.title(f'Error estimation for {gas} {var} type {type}')
     plt.show()
 
@@ -103,7 +115,8 @@ def plot_types(df: pd.DataFrame, gas: str, var: str, level_of_interest: int):
         (df['var'] == var) &
         (df['level_of_interest'] == level_of_interest)
     ].groupby(['threshold', 'type']).mean()['err'].unstack().plot.bar(logy=True, rot=0)
-    plt.title(f'Error estimation {gas} {var} with level of interest {level_of_interest}')
+    plt.title(
+        f'Error estimation {gas} {var} with level of interest {level_of_interest}')
     plt.show()
 
 
@@ -216,4 +229,15 @@ plot_size_for(size_season, 'Tatm', 'n')
 plot_error_estimation_for(err_season, 'Tatm', 'n', -19)
 
 
-#%%
+# %%
+wv_avk = err_season[
+    (err_season['gas'] == 'WV') &
+    (err_season['var'] == 'avk')
+]
+groups = wv_avk.groupby(['threshold', 'level_of_interest'])
+ax = groups.mean()['err'].unstack().plot.bar(logy=True, rot=0)
+ax.invert_xaxis()
+plt.xticks(np.arange(5), map(lambda t: f'{t:.0e}', thresholds))
+plt.show()
+
+# %%
