@@ -1,10 +1,13 @@
 {
-    "python.pythonPath": "venv/bin/python",
-    "python.unitTest.unittestArgs": [
+    "python.pythonPath": "/home/andreas/.miniconda3/envs/iasi/bin/python",
+    "python.testing.unittestArgs": [
+        "-v",
         "-s",
         "./test",
+        "-p",
+        "test_*.py"
     ],
-    "python.unitTest.pyTestEnabled": false,
-    "python.unitTest.nosetestsEnabled": false,
-    "python.unitTest.unittestEnabled": true
+    "python.testing.pyTestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.unittestEnabled": true
 }

@@ -32,9 +32,12 @@ class Decomposition:
     def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
         raise NotImplementedError
 
-    def select_significant(self, eigenvalues: List) -> List:
-        most_significant = eigenvalues[0]
-        return list(filter(lambda eig: eig > most_significant * self.threshold, eigenvalues))
+    def target_rank(self, eigenvalues: List) -> int:
+        most_significant = abs(eigenvalues[0])
+        for k, eigenvalue in enumerate(np.abs(eigenvalues)):
+            if eigenvalue < most_significant * self.threshold:
+                return k
+        return len(eigenvalues)
 
     def matrix_ok(self, event, path, matrix):
         ok = True
@@ -77,9 +80,17 @@ class SingularValueDecomposition(Decomposition):
                 continue
             # decompose reduced array
             U, s, Vh = np.linalg.svd(matrix.data, full_matrices=False)
+            if np.iscomplex(U).any():
+                raise ValueError(
+                    f'Left-singuar values are complex for {path}:{event}')
+            if np.iscomplex(s).any():
+                raise ValueError(f'Eigenvalues are complex for {path}:{event}')
+            if np.iscomplex(Vh).any():
+                raise ValueError(
+                    f'Right-singlar values are complex for {path}:{event}')
             # find k eigenvalues
-            sigma = self.select_significant(s)
-            k = len(sigma)
+            k = self.target_rank(s)
+            sigma = s[:k]
             max_k = max(k, max_k)
             # assign sliced decomposition to all
             all_k[event] = k
@@ -90,18 +101,22 @@ class SingularValueDecomposition(Decomposition):
         upper_dim, lower_dim = q.upper_and_lower_dimension()
         group = output.createGroup(path)
         group.createDimension('rank', size=max_k)
-        # TODO add group description
+        group.description = f'singular value decomposistion of {var.description}. reconstruction with (U * s).dot(Vh)'
         k_out = group.createVariable('k', 'i1', ('event'))
         k_out[:] = all_k[:]
+        k_out.description = 'target rank of decomposition (number of eigenvalues)'
         U_dim = ('event', upper_dim, 'rank')
         U_out = group.createVariable('U', 'f', U_dim, zlib=True)
         U_out[:] = all_U[:, :, :max_k]
+        U_out = 'left-singular vectors of decompositon'
         s_dim = ('event', 'rank')
         s_out = group.createVariable('s', 'f', s_dim, zlib=True)
         s_out[:] = all_s[:, :max_k]
+        s_out.description = 'eigenvalues of decomposition'
         Vh_dim = ('event', 'rank', lower_dim)
         Vh_out = group.createVariable('Vh', 'f', Vh_dim, zlib=True)
         Vh_out[:] = all_Vh[:, :max_k, :]
+        Vh_out.description = 'transposed right-singular vectors of decompositon'
 
 
 class EigenDecomposition(Decomposition):
@@ -123,30 +138,51 @@ class EigenDecomposition(Decomposition):
             level = int(levels.data[event])
             # reduce array dimensions
             matrix = q.transform(var[event][...], level)
-            # decompose reduced array
             if not self.matrix_ok(event, path, matrix):
                 continue
-            # TODO: use np.linalg.eigh for square matrices (probably more performant)
+            # test if nearlly symmetric
+            matrix = matrix.data
+            if not np.allclose(matrix, matrix.T):
+                raise ValueError(f'Noise matrix is not symmeric for {path}:{event}')
+            # make matrix symmetric by fixing rounding errors
+            matrix = (matrix + matrix.T) / 2
+            # decompose matrix
             eigenvalues, eigenvectors = np.linalg.eig(matrix)
-            most_significant = self.select_significant(eigenvalues)
-            k = len(most_significant)
-            all_k[event] = k
+            # should not be complex anymore because matrix is symmetric (see above)
+            if np.iscomplex(eigenvalues).any():
+                raise ValueError(f'Eigenvalues are complex for {path}:{event}')
+            if np.iscomplex(eigenvectors).any():
+                raise ValueError(f'Eigenvectors are complex for {path}:{event}')
+            # covarinace maticies are postive semi definite
+            # this implies that eigenvalues are positive
+            # unfortuenately, due to floating point errors this is not garantueed 
+            # to address this problem we assume negative eigenpairs as negligible and filter them
+            selected_eigenvalues = []
+            selected_eigenvectors = []
+            max_eigenvalue = eigenvalues.max()
+            for value, vector in zip(eigenvalues, eigenvectors.T):
+                if value > 0 and (max_eigenvalue * self.threshold < value):
+                    selected_eigenvalues.append(value)
+                    selected_eigenvectors.append(vector)
+            k = len(selected_eigenvalues)
             max_k = max(k, max_k)
-            # TODO check for imag values or symmetric property. already happend!
-            try:
-                all_Q[event][:eigenvectors.shape[0], :k] = eigenvectors[:, :k]
-                all_s[event][:k] = most_significant
-            except ValueError as error:
-                logging.error('Failed to assign values')
+            selected_eigenvectors = np.array(selected_eigenvectors).T
+            all_k[event] = k
+            all_Q[event][:selected_eigenvectors.shape[0], :k] = selected_eigenvectors[:, :k]
+            all_s[event][:k] = selected_eigenvalues
         # write all to output
         dimension_name, _ = q.upper_and_lower_dimension()
         target_group = output.createGroup(path)
         target_group.createDimension('rank', size=max_k)
+        target_group.description = f'eigen decomposition of {var.description}. reconstruction with (Q * s).dot(Q.T)'
         k_out = target_group.createVariable('k', 'i1', ('event'))
         k_out[:] = all_k[:]
+        k_out.description = 'target rank of decomposition (number of eigenvalues)'
         Q_dim = ('event', dimension_name, 'rank')
         Q_out = target_group.createVariable('Q', 'f', Q_dim, zlib=True)
         Q_out[:] = all_Q[:, :, :max_k]
+        Q_out.description = 'eigenvectors of noise matrix'
         s_dim = ('event', 'rank')
         s_out = target_group.createVariable('s', 'f', s_dim, zlib=True)
         s_out[:] = all_s[:, :max_k]
+        s_out.description = 'eigenvalues of noise matrix'

@@ -42,6 +42,7 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
         input = Dataset(self.input().path)
         with self.output().temporary_path() as target:
             output = Dataset(target, 'w', format=self.format)
+            output.compression_threshold = self.threshold
             self.copy_dimensions(input, output, recursive=False)
             self.copy_variables(input, output)
             levels = input['atm_nol'][...]
@@ -155,11 +156,7 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
             attribute = input[var_path]
             if isinstance(attribute, Group):
                 for var in attribute.variables.values():
-                    compressed = self.ancestor == 'CompressDataset'
-                    self.copy_variable(
-                        output, var, f'{attribute.path}/{var.name}', compressed=compressed)
+                    self.copy_variable(output, var, f'{attribute.path}/{var.name}', compressed=True)
             else:
                 assert isinstance(attribute, Variable)
-                compressed = self.ancestor == 'CompressDataset'
-                self.copy_variable(output, attribute, var_path,
-                                   compressed=compressed)
+                self.copy_variable(output, attribute, var_path, compressed=True)

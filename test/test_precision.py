@@ -7,11 +7,13 @@ import luigi
 import numpy as np
 from netCDF4 import Dataset, Group, Variable
 
-from iasi import Composition, CompressDataset, DecompressDataset, MoveVariables
+from iasi.compression import CompressDataset, DecompressDataset
+from iasi.file import MoveVariables
 from iasi.util import child_groups_of, child_variables_of
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
 
 class TestCompareDecompressionResult(unittest.TestCase):
     @classmethod
@@ -62,7 +64,9 @@ class TestCompareDecompressionResult(unittest.TestCase):
             original = var[...]
             reconstructed = self.compressed[path][...]
             same_mask = np.equal(original.mask, reconstructed.mask).all()
-            self.assertTrue(same_mask, f'reconstruced mask is not equal for {path}')
+            self.assertTrue(
+                same_mask, f'reconstruced mask is not equal for {path}')
             close = np.ma.allclose(original, reconstructed, atol=1e-3)
-            self.assertTrue(close, f'reconstruction values are not close for {path}')
+            self.assertTrue(
+                close, f'reconstruction values are not close for {path}')
             logger.debug('All variables are close for %s', path)

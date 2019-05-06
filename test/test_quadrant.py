@@ -4,8 +4,11 @@ import luigi
 import numpy as np
 from netCDF4 import Dataset, Group, Variable
 
-from iasi import CompressDataset, MoveVariables
-from iasi.quadrant import Quadrant, AssembleTwoQuadrants, AssembleFourQuadrants, DisassembleTwoQuadrants, DisassembleFourQuadrants
+from iasi.compression import CompressDataset
+from iasi.file import MoveVariables
+from iasi.quadrant import (AssembleFourQuadrants, AssembleTwoQuadrants,
+                           DisassembleFourQuadrants, DisassembleTwoQuadrants,
+                           Quadrant)
 from iasi.util import child_groups_of, child_variables_of
 
 

@@ -3,8 +3,8 @@ import unittest
 import luigi
 from netCDF4 import Dataset
 
-from iasi import CopyNetcdfFile, MoveVariables
 from iasi.compression import SelectSingleVariable
+from iasi.file import CopyNetcdfFile, MoveVariables
 from iasi.util import child_variables_of
 
 

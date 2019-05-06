@@ -3,7 +3,7 @@ import unittest
 import luigi
 import pandas as pd
 
-from iasi import DirectAposteriori, SvdAposteriori, EigenAposteriori
+from iasi.aposteriori import DirectAposteriori, SvdAposteriori, EigenAposteriori
 
 
 class TestAposterioriProcessing(unittest.TestCase):

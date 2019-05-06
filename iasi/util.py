@@ -29,6 +29,13 @@ def child_variables_of(group: Group):
             yield (subgroup, variable)
 
 
+def root_group_of(group: Group) -> Group:
+    if group.parent:
+        return root_group_of(group.parent)
+    else:
+        return group
+
+
 class custom(luigi.Config):
     tracking_url = luigi.Parameter(default='http://localhost:8082')
 
@@ -110,7 +117,9 @@ class CustomTask(luigi.Task):
         if ext:
             name, _ = os.path.splitext(filename)
             filename = f'{name}.{ext}'
-        return os.path.join(self.dst, *args, filename)
+        path = os.path.join(self.dst, *args)
+        os.makedirs(path, exist_ok=True)
+        return os.path.join(path, filename)
 
     def create_local_target(self, *args: str, file: str, ext: str = None) -> luigi.LocalTarget:
         _, filename = os.path.split(file)

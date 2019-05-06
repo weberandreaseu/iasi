@@ -6,6 +6,7 @@ from netCDF4 import Dataset, Group, Variable
 
 from iasi.file import CopyNetcdfFile, MoveVariables
 from iasi.quadrant import Quadrant
+from iasi.util import root_group_of
 
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,13 @@ class Composition:
         raise NotImplementedError
 
     def _export_reconstruction(self, target: Dataset, array: np.ma.MaskedArray, quadrant: Quadrant):
+        root = root_group_of(self.group)
+        existing_dimensions = target.dimensions.keys()
+        for name, dim in root.dimensions.items():
+            if name in existing_dimensions:
+                continue
+            target.createDimension(
+                name, len(dim) if not dim.isunlimited() else None)
         var = quadrant.create_variable(target, self.group.path)
         var[:] = array[:]
 

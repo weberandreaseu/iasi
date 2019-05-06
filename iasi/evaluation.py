@@ -263,7 +263,8 @@ class ErrorEstimation:
             else:
                 rc_event = None
             if isinstance(self, WaterVapour):
-                avk_event = AssembleFourQuadrants(nol_event).transform(self.avk[event], nol_event)
+                avk_event = AssembleFourQuadrants(
+                    nol_event).transform(self.avk[event], nol_event)
                 if avk_event.mask.any():
                     logger.warn('Original avk contains masked values')
                 avk_event = avk_event.data
@@ -276,14 +277,27 @@ class ErrorEstimation:
                 error = estimation_method(
                     original_event.data, rc_event, covariance, type2=calc_type_two, avk=avk_event)
                 for loi in self.levels_of_interest:
-                    level = nol_event + loi
-                    if level < 2:
-                        continue
+                    # zero == surface (special value)
+                    if loi == 0:
+                        level = 0
+                    # for other levels substract from highest level
+                    else:
+                        level = nol_event + loi
+                        if level < 2:
+                            continue
                     result['event'].append(event)
                     result['level_of_interest'].append(loi)
                     result['err'].append(error[level, level])
                     result['rc_error'].append(rc_error)
                     result['type'].append(2 if calc_type_two else 1)
+                    if self.gas == 'GHG':
+                        # for greenhouse gases export also CH4 (lower right quadrant)
+                        # nol as index offset for error level
+                        result['event'].append(event)
+                        result['level_of_interest'].append(loi - 29)
+                        result['err'].append(error[level + nol_event, level + nol_event])
+                        result['rc_error'].append(rc_error)
+                        result['type'].append(2 if calc_type_two else 1)
                 # stop if type 1 is calculated
                 if not calc_type_two:
                     break
@@ -302,7 +316,7 @@ class ErrorEstimation:
 
 
 class WaterVapour(ErrorEstimation):
-    levels_of_interest = [-16, -19]
+    levels_of_interest = [-6, -16, -19]
 
     def __init__(self, gas, nol, alt, avk, type_two=True):
         super().__init__(gas, nol, alt, type_two=type_two)
@@ -387,7 +401,7 @@ class WaterVapour(ErrorEstimation):
 
 
 class GreenhouseGas(ErrorEstimation):
-    levels_of_interest = [-10, -19]
+    levels_of_interest = [-6, -10, -19]
 
     def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         assert not type2
@@ -437,8 +451,8 @@ class NitridAcid(ErrorEstimation):
 
 
 class AtmosphericTemperature(ErrorEstimation):
-    # TODO add lowest nol
-    levels_of_interest = [-19]
+    # zero means surface
+    levels_of_interest = [0, -10, -19]
 
     def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         assert not type2
