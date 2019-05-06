@@ -2,14 +2,16 @@
 # # Error Estimation
 # %%
 import glob
+import logging
+import os
 
+import cartopy.crs as ccrs
 import luigi
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import logging
-import os
+from netCDF4 import Dataset
 
 thresholds = [1e-5, 1e-4, 1e-3, 1e-2, 0]
 
@@ -28,16 +30,26 @@ def altitude_by(level_of_interest: int):
     return map.get(level_of_interest)
 
 
-def import_data(path_pattern: str, gas: str = None, var: str = None) -> pd.DataFrame:
+def import_data(path_pattern: str,
+                gas: str = None,
+                var: str = None,
+                threshold: float = None,
+                loi: int = None,
+                type: int = None,
+                inlcude_coordinates=True) -> pd.DataFrame:
     frames = []
     for file in glob.glob(path_pattern):
         frame = pd.read_csv(file, index_col=None, header=0)
         # filter to gas and variables
+        if loi:
+            frame = frame[frame['level_of_interest'] == loi]
         if gas:
             gas = gas.split('_')[0]
             frame = frame[frame['gas'] == gas]
         if var:
             frame = frame[frame['var'] == var]
+        if threshold:
+            frame = frame[frame['threshold'] == threshold]
         # set threshold == 0 to 1 for consistency
         frame['threshold'].replace(0, 1, inplace=True)
         if 'level_of_interest' in frame:
@@ -51,33 +63,52 @@ def import_data(path_pattern: str, gas: str = None, var: str = None) -> pd.DataF
                 frame['level_of_interest'] >= -29), 'gas'] = 'GHG_N2O'
             frame.loc[(frame['gas'] == 'GHG') & (
                 frame['level_of_interest'] < -29), 'gas'] = 'GHG_CH4'
+        if inlcude_coordinates:
+            _, filename = os.path.split(file)
+            orbit, _ = os.path.splitext(filename)
+            nc = Dataset(f'data/eigenvalues/{orbit}.nc')
+            lat = nc['lat'][...]
+            lon = nc['lon'][...]
+            coordinates = np.block([[lat], [lon]])
+            coordinates = pd.DataFrame(coordinates.T, columns=['lat', 'lon'])
+            frame = frame.merge(coordinates, left_on='event', right_index=True)
         frames.append(frame)
 
     return pd.concat(frames, axis=0, ignore_index=True)
 
 
 # %%
-def aggregate_error(path_pattern: str):
-    for file in glob.glob(path_pattern):
-        df = import_data(file)
-        aggregated = df.groupby(
-            ['gas', 'var', 'threshold', 'level_of_interest', 'type'])['err'].mean()
-        path, filename = os.path.split(file)
-        target = os.path.join(path, 'aggregated', filename)
-        aggregated.to_csv(
-            target, header=['err'], index_label=['gas', 'var', 'threshold', 'level_of_interest', 'type'])
+# def aggregate_error(path_pattern: str):
+#     for file in glob.glob(path_pattern):
+#         df = import_data(file)
+#         aggregated = df.groupby(
+#             ['gas', 'var', 'threshold', 'level_of_interest', 'type'])['err'].mean()
+#         path, filename = os.path.split(file)
+#         target = os.path.join(path, 'aggregated', filename)
+#         aggregated.to_csv(
+#             target, header=['err'], index_label=['gas', 'var', 'threshold', 'level_of_interest', 'type'])
 
-aggregate_error('data/motiv/error-estimation/*.csv')
 
-#%%
-def load_aggregated(path_pattern: str) -> pd.DataFrame:
-    frames = []
-    for file in glob.glob(path_pattern):
-        frame = pd.read_csv(file, index_col=None, header=0)
-        frames.append(frame)
-    return pd.concat(frames, axis=0, ignore_index=True)
+# aggregate_error('data/motiv/error-estimation/*.csv')
+
+# # %%
+
+
+# def load_aggregated(path_pattern: str) -> pd.DataFrame:
+#     frames = []
+#     for file in glob.glob(path_pattern):
+#         frame = pd.read_csv(file, index_col=None, header=0)
+#         frames.append(frame)
+#     return pd.concat(frames, axis=0, ignore_index=True)
+
 
 # %%
+
+file = 'data/motiv/error-estimation/METOPA_20160201001156_48180_20190323165817.csv'
+df = import_data(file, gas='WV', var='avk',
+                 inlcude_coordinates=False, loi=-6, threshold=1e-3, type=1)
+
+
 # %%
 err_winter = import_data(
     'data/motiv/error-estimation/METOP*_20160201*.csv', 'Tatm')
