@@ -8,8 +8,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import logging
+import os
 
-thresholds = [1e-5, 1e-4, 1e-3, 1e-2, 1]
+thresholds = [1e-5, 1e-4, 1e-3, 1e-2, 0]
 
 
 def altitude_by(level_of_interest: int):
@@ -33,6 +35,7 @@ def import_data(path_pattern: str, gas: str = None, var: str = None) -> pd.DataF
         frame = pd.read_csv(file, index_col=None, header=0)
         # filter to gas and variables
         if gas:
+            gas = gas.split('_')[0]
             frame = frame[frame['gas'] == gas]
         if var:
             frame = frame[frame['var'] == var]
@@ -55,25 +58,42 @@ def import_data(path_pattern: str, gas: str = None, var: str = None) -> pd.DataF
 
 
 # %%
+def aggregate_error(path_pattern: str):
+    for file in glob.glob(path_pattern):
+        df = import_data(file)
+        aggregated = df.groupby(
+            ['gas', 'var', 'threshold', 'level_of_interest', 'type'])['err'].mean()
+        path, filename = os.path.split(file)
+        target = os.path.join(path, 'aggregated', filename)
+        aggregated.to_csv(
+            target, header=['err'], index_label=['gas', 'var', 'threshold', 'level_of_interest', 'type'])
+
+aggregate_error('data/motiv/error-estimation/*.csv')
+
+#%%
+def load_aggregated(path_pattern: str) -> pd.DataFrame:
+    frames = []
+    for file in glob.glob(path_pattern):
+        frame = pd.read_csv(file, index_col=None, header=0)
+        frames.append(frame)
+    return pd.concat(frames, axis=0, ignore_index=True)
+
+# %%
+# %%
 err_winter = import_data(
     'data/motiv/error-estimation/METOP*_20160201*.csv', 'Tatm')
 # %%
-err_summer = import_data(
-    'data/motiv/error-estimation/METOP*_20160801*.csv', 'Tatm')
+# err_summer = import_data(
+#     'data/motiv/error-estimation/METOP*_20160801*.csv', 'Tatm')
 # %%
-size_winter = import_data(
-    'data/motiv/compression-summary/METOP*_20160201*.csv')
+# size_winter = import_data(
+#     'data/motiv/compression-summary/METOP*_20160201*.csv')
 # %%
-size_summer = import_data(
-    'data/motiv/compression-summary/METOP*_20160801*.csv')
+size = import_data(
+    'data/motiv/compression-summary/METOP*_2016*.csv')
 
 # %% [markdown]
 # Season: Winter
-
-# %%
-err_season = err_winter
-# %%
-size_season = size_winter
 
 # %%
 
@@ -90,9 +110,9 @@ def plot_levels(df: pd.DataFrame, gas: str, var: str, type, season=None):
     ].groupby(['threshold', 'altitude']).mean()['err'].unstack().plot.bar(logy=True, rot=0, figsize=(4, 4))
     ax.invert_xaxis()
     plt.xticks(np.arange(5), map(lambda t: f'{t:.0e}', thresholds))
-    plt.title(f'Error estimation for {gas} {var} type {type}')
+    # plt.title(f'Error estimation for {gas} {var} type {type}')
     ax.set_xlabel('Threshold for eigenvalue selection')
-    plt.savefig(f'{gas}_{var}_{season}.pdf')
+    plt.savefig(f'err_{gas}_{var}_type{type}.pdf')
     plt.show()
 
 
@@ -102,11 +122,12 @@ def plot_types(df: pd.DataFrame, gas: str, var: str, level_of_interest: int):
         (df['var'] == var) &
         (df['level_of_interest'] == level_of_interest)
     ].groupby(['threshold', 'type']).mean()['err'].unstack().plot.bar(logy=True, rot=0, figsize=(4, 4))
-    plt.title(
-        f'Error estimation {gas} {var} with level of interest {level_of_interest}')
+    # plt.title(
+    #     f'Error estimation {gas} {var} with level of interest {level_of_interest}')
     ax.invert_xaxis()
     ax.set_xlabel('Threshold for eigenvalue selection')
     plt.xticks(np.arange(5), map(lambda t: f'{t:.0e}', thresholds))
+    plt.savefig(f'err_{gas}_{var}_loi{level_of_interest}.pdf')
     plt.show()
 
 
@@ -135,11 +156,54 @@ def plot_size_for(df: pd.DataFrame, gas: str, var: str):
     plt.show()
 
 
+# %%
+plots = [
+    # WV avk
+    {'method': plot_levels, 'gas': 'WV', 'var': 'avk', 'type': 1},
+    {'method': plot_levels, 'gas': 'WV', 'var': 'avk', 'type': 2},
+    {'method': plot_types, 'gas': 'WV', 'var': 'avk', 'level_of_interest': -19},
+    {'method': plot_types, 'gas': 'WV', 'var': 'avk', 'level_of_interest': -16},
+    # WV n
+    {'method': plot_levels, 'gas': 'WV', 'var': 'n', 'type': 1},
+    {'method': plot_levels, 'gas': 'WV', 'var': 'n', 'type': 2},
+    {'method': plot_types, 'gas': 'WV', 'var': 'n', 'level_of_interest': -19},
+    {'method': plot_types, 'gas': 'WV', 'var': 'n', 'level_of_interest': -16},
+    # WV Tatmxavk
+    {'method': plot_levels, 'gas': 'WV', 'var': 'Tatmxavk', 'type': 1},
+    {'method': plot_levels, 'gas': 'WV', 'var': 'Tatmxavk', 'type': 2},
+    {'method': plot_types, 'gas': 'WV', 'var': 'Tatmxavk', 'level_of_interest': -19},
+    {'method': plot_types, 'gas': 'WV', 'var': 'Tatmxavk', 'level_of_interest': -16},
+    # GHG
+    {'method': plot_levels, 'gas': 'GHG_CH4', 'var': 'avk', 'type': 1},
+    {'method': plot_levels, 'gas': 'GHG_N2O', 'var': 'avk', 'type': 1},
+    {'method': plot_levels, 'gas': 'GHG_CH4', 'var': 'n', 'type': 1},
+    {'method': plot_levels, 'gas': 'GHG_N2O', 'var': 'n', 'type': 1},
+    {'method': plot_levels, 'gas': 'GHG_CH4', 'var': 'Tatmxavk', 'type': 1},
+    {'method': plot_levels, 'gas': 'GHG_N2O', 'var': 'Tatmxavk', 'type': 1},
+    # HNO3
+    {'method': plot_levels, 'gas': 'HNO3', 'var': 'avk', 'type': 1},
+    {'method': plot_levels, 'gas': 'HNO3', 'var': 'n', 'type': 1},
+    {'method': plot_levels, 'gas': 'HNO3', 'var': 'Tatmxavk', 'type': 1},
+    # Tatm
+    {'method': plot_levels, 'gas': 'Tatm', 'var': 'avk', 'type': 1},
+    {'method': plot_levels, 'gas': 'Tatm', 'var': 'n', 'type': 1},
+]
+
+for plot in plots:
+    print('plotting', plot)
+    df = import_data('data/motiv/error-estimation/*.csv',
+                     gas=plot['gas'],
+                     var=plot['var'])
+    method = plot.pop('method')
+    method(df, **plot)
+    del df
+
+
 # %%[markdown]
 # # Water Vapour
 #
 # ### Averaging Kernel
-plot_size_for(size_summer, 'WV', 'avk')
+plot_size_for(size, 'WV', 'avk')
 # %%
 plot_levels(err_winter, 'WV', 'avk', 1)
 # %%
@@ -151,7 +215,7 @@ plot_types(err_summer, 'WV', 'avk', -16)
 
 # %%[markdown]
 # ## Noise Matrix
-plot_size_for(size_winter, 'WV', 'n')
+plot_size_for(size, 'WV', 'n')
 # %%
 plot_levels(err_winter, 'WV', 'n', 1)
 # %%
@@ -163,7 +227,7 @@ plot_types(err_summer, 'WV', 'n', -16)
 
 # %%[markdown]
 # ## Cross averaging kernels with atmospheric temperature
-plot_size_for(size_winter, 'WV', 'Tatmxavk')
+plot_size_for(size, 'WV', 'Tatmxavk')
 # %% [markdown]
 plot_levels(err_summer, 'WV', 'Tatmxavk', 1)
 # %% [markdown]
@@ -176,45 +240,45 @@ plot_types(err_summer, 'WV', 'Tatmxavk', -16)
 # %% [markdown]
 # # Greenhouse gases
 # ## Averaging kernel
-plot_size_for(size_winter, 'GHG', 'avk')
+plot_size_for(size, 'GHG', 'avk')
 
 # %%
 plot_levels(err_winter, 'GHG_CH4', 'avk', 1)
 
 # %% [markdown]
 # ## Noise matrix
-plot_size_for(size_summer, 'GHG', 'n')
+plot_size_for(size, 'GHG', 'n')
 
 # %%
 plot_levels(err_summer, 'GHG_CH4', 'n', 1, season='summer')
 # %% [markdown]
 # ## Cross averaging kernel
-plot_size_for(size_summer, 'GHG', 'Tatmxavk')
+plot_size_for(size, 'GHG', 'Tatmxavk')
 # %%
 plot_levels(err_summer, 'GHG_CH4', 'Tatmxavk', 1, season='summer')
 
 # %% [markdown]
 # # Nitrid Acid
 
-plot_size_for(size_winter, 'HNO3', 'avk')
+plot_size_for(size, 'HNO3', 'avk')
 # %%
 plot_levels(err_summer, 'HNO3', 'avk', type=1, season='summer')
 # %%
-plot_size_for(size_summer, 'HNO3', 'Tatmxavk')
+plot_size_for(size, 'HNO3', 'Tatmxavk')
 # %%
 plot_levels(err_summer, 'HNO3', 'Tatmxavk', type=1, season='summer')
 # %%
-plot_size_for(size_summer, 'HNO3', 'n')
+plot_size_for(size, 'HNO3', 'n')
 # %%
 plot_levels(err_summer, 'HNO3', 'n', type=1, season='summer')
 
 # %% [markdown]
 # # Atmospheric Temperature
 # %%
-plot_size_for(size_summer, 'Tatm', 'avk')
+plot_size_for(size, 'Tatm', 'avk')
 # %%
 plot_levels(err_summer, 'Tatm', 'avk', type=1, season='summer')
 # %%
-plot_size_for(size_summer, 'Tatm', 'n')
+plot_size_for(size, 'Tatm', 'n')
 # %%
 plot_levels(err_summer, 'Tatm', 'n',  type=1, season='summer')
