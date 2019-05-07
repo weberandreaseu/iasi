@@ -1,6 +1,7 @@
 # %% [markdown]
 # # Error Estimation
 # %%
+from datetime import datetime
 import glob
 import logging
 import os
@@ -175,6 +176,54 @@ summer = import_data('data/motiv/error-estimation/METOP*_20160801*.csv',
                      loi=-19,
                      threshold=0.001,
                      type=1)
+# %%
+
+
+def import_size(path_pattern: str):
+    frames = []
+    for file in glob.glob(path_pattern):
+        # frame = pd.read_csv(file, index_col=None, header=0)
+        frame = pd.read_csv(file)
+        if 'size' in frame:
+            frame['size'] = frame['size'] / 1000
+        datestring = file.split('_')[1]
+        date = datetime.strptime(datestring[:8], '%Y%m%d')
+        frame['date'] = date.date()
+        frames.append(frame)
+    return pd.concat(frames, axis=0, ignore_index=True)
+
+
+size = import_size('data/motiv/compression-summary/METOP*.csv')
+# %%
+
+
+def plot_size_season(df: pd.DataFrame, gas: str, var: str):
+    original = df[
+        (df['ancestor'] == 'MoveVariables') &
+        (df['gas'] == gas) &
+        (df['variable'] == var)
+    ]
+    compressed = df[
+        (df['ancestor'] == 'CompressDataset') &
+        (df['gas'] == gas) &
+        (df['variable'] == var)
+    ]
+    ax = compressed.groupby(['threshold', 'date']).mean()[
+        'size'].unstack().plot.bar(rot=0, legend=True, figsize=(4, 4))
+
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for index, (name, group) in enumerate(original.groupby(['date'])):
+        group_mean = group.mean()['size']
+        ax.axhline(group_mean, color=colors[index], linestyle='--')
+    ax.invert_xaxis()
+    ax.set_ylabel('Mean size per orbit in MB')
+    ax.set_xlabel('Threshold for eigenvalue selection')
+    plt.xticks(np.arange(4), map(lambda t: f'{t:.0e}', thresholds))
+    plt.title(f'Data size reduction for {gas} {var}')
+    plt.show()
+
+plot_size_season(size, 'WV', 'avk')
+
 # %%
 # plot_season_map(summer, winter)
 # %%
