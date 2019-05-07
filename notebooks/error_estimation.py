@@ -8,6 +8,7 @@ import os
 import cartopy.crs as ccrs
 import luigi
 import matplotlib
+import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -48,10 +49,12 @@ def import_data(path_pattern: str,
             frame = frame[frame['gas'] == gas]
         if var:
             frame = frame[frame['var'] == var]
+        # set threshold == 0 to 1 for consistency
+        if type:
+            frame = frame[frame['type'] == type]
+        frame['threshold'].replace(0, 1, inplace=True)
         if threshold:
             frame = frame[frame['threshold'] == threshold]
-        # set threshold == 0 to 1 for consistency
-        frame['threshold'].replace(0, 1, inplace=True)
         if 'level_of_interest' in frame:
             # set altitudes
             frame['altitude'] = frame['level_of_interest'].apply(altitude_by)
@@ -77,6 +80,23 @@ def import_data(path_pattern: str,
     return pd.concat(frames, axis=0, ignore_index=True)
 
 
+def plot_error_map(df, gas=None, var=None, season=None):
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    sc = ax.scatter(
+        df.lon,
+        df.lat,
+        c=df['err'],
+        marker='.',
+        s=2,
+        # log scale for error
+        norm=colors.LogNorm(df.err.min(), df.err.max()),
+        transform=ccrs.PlateCarree())
+    plt.colorbar(sc)
+    ax.coastlines()
+    if season:
+        plt.savefig(f'map_{gas}_{var}_{season}.pdf')
+    plt.show()
+
 # %%
 # def aggregate_error(path_pattern: str):
 #     for file in glob.glob(path_pattern):
@@ -101,23 +121,62 @@ def import_data(path_pattern: str,
 #         frames.append(frame)
 #     return pd.concat(frames, axis=0, ignore_index=True)
 
+# %%
+def plot_season_map(summer: pd.DataFrame, winter: pd.DataFrame):
+    min_err = min(summer.err.min(), winter.err.min())
+    max_err = max(summer.err.max(), winter.err.max())
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1, figsize=(6, 6), subplot_kw={'projection': ccrs.PlateCarree()})
+    sc1 = ax1.scatter(
+        summer.lon,
+        summer.lat,
+        c=summer['err'],
+        marker='.',
+        s=2,
+        # log scale for error
+        norm=colors.LogNorm(min_err, max_err),
+        vmin=min_err,
+        vmax=max_err,
+        transform=ccrs.PlateCarree())
+    # plt.colorbar(sc1)
+    ax1.coastlines()
+    ax1.set_title('2016-08-01')
+    sc2 = ax2.scatter(
+        winter.lon,
+        winter.lat,
+        c=winter['err'],
+        marker='.',
+        s=2,
+        # log scale for error
+        norm=colors.LogNorm(min_err, max_err),
+        vmin=min_err,
+        vmax=max_err,
+        transform=ccrs.PlateCarree())
+    ax2.coastlines()
+    ax2.set_title('2016-02-01')
+    fig.subplots_adjust(right=0.82)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.02, 0.7])
+    fig.colorbar(sc2, cax=cbar_ax)
+    plt.savefig('avk_winter_summer.pdf')
+
 
 # %%
-
-file = 'data/motiv/error-estimation/METOPA_20160201001156_48180_20190323165817.csv'
-df = import_data(file, gas='WV', var='avk',
-                 inlcude_coordinates=False, loi=-6, threshold=1e-3, type=1)
-
-
+winter = import_data('data/motiv/error-estimation/METOPA_20160201*.csv',
+                     gas='WV',
+                     var='avk',
+                     inlcude_coordinates=True,
+                     loi=-19,
+                     threshold=0.001,
+                     type=1)
+summer = import_data('data/motiv/error-estimation/METOP*_20160801*.csv',
+                     gas='WV',
+                     var='avk',
+                     inlcude_coordinates=True,
+                     loi=-19,
+                     threshold=0.001,
+                     type=1)
 # %%
-err_winter = import_data(
-    'data/motiv/error-estimation/METOP*_20160201*.csv', 'Tatm')
-# %%
-# err_summer = import_data(
-#     'data/motiv/error-estimation/METOP*_20160801*.csv', 'Tatm')
-# %%
-# size_winter = import_data(
-#     'data/motiv/compression-summary/METOP*_20160201*.csv')
+# plot_season_map(summer, winter)
 # %%
 size = import_data(
     'data/motiv/compression-summary/METOP*_2016*.csv')
