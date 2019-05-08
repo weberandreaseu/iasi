@@ -9,3 +9,7 @@ if [ -z "$input" ] || [ -z "$output" ]; then
 fi
 
 ncks -v state_WVatm_avk,state_WVatm,atm_altitude,state_WVatm_a,atm_nol,lat,lon,fit_quality,iter,srf_flag,Time,Date $input $output
+
+# for file in *.nc; do
+#     ncks --overwrite -v lat,lon,state/WV/avk/k,state/WV/n/k,state/WV/Tatmxavk/k,state/GHG/avk/k,state/GHG/n/k,state/GHG/Tatmxavk/k,state/HNO3/avk/k,state/HNO3/n/k,state/HNO3/Tatmxavk/k,state/Tatm/n/k,state/Tatm/avk/k $file ~/git/python/iasi-analysis/data/eigenvalues/$file
+# done
