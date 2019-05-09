@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import List
+from typing import List, Dict
 
 import luigi
 import numpy as np
@@ -12,7 +12,7 @@ import iasi
 logger = logging.getLogger(__name__)
 
 
-def dimensions_of(variable: Variable):
+def dimensions_of(variable: Variable) -> Dict:
     return {name: dim for name, dim in zip(variable.dimensions, variable.shape)}
 
 

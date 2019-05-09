@@ -40,7 +40,10 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
         return luigi.LocalTarget(path=path)
 
     def log_file(self):
-        return self.create_local_path('compression', str(self.threshold), file=self.file, ext='log')
+        if self.threshold:
+            return self.create_local_path('compression', str(self.threshold), file=self.file, ext='log')
+        else:
+            return self.create_local_path('compression', file=self.file, ext='log')
 
     def run(self):
         input = Dataset(self.input().path)
@@ -48,6 +51,7 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
             output = Dataset(target, 'w', format=self.format)
             self.copy_dimensions(input, output, recursive=False)
             self.copy_variables(input, output)
+            # TOOD refactor
             levels = input['atm_nol'][...]
             dim_levels = input.dimensions['atmospheric_grid_levels'].size
             dim_species = input.dimensions['atmospheric_species'].size
@@ -80,11 +84,22 @@ class DecompressDataset(CompressionParams, CopyNetcdfFile):
     # exclude variables starting with state
     exclusion_pattern = r'\/?state\S*'
 
+    # TODO refactor
     def output(self):
-        return self.create_local_target('decompression', str(self.threshold), file=self.file)
+        if self.threshold:
+            path = self.create_local_path(
+                'decompression', str(self.threshold), file=self.file)
+        else:
+            path = self.create_local_path('decompression', file=self.file)
 
+        return luigi.LocalTarget(path=path)
+
+    # TODO refactor
     def log_file(self):
-        return self.create_local_path('decompression', str(self.threshold), file=self.file, ext='log')
+        if self.threshold:
+            return self.create_local_path('decompression', str(self.threshold), file=self.file, ext='log')
+        else:
+            return self.create_local_path('decompression', file=self.file, ext='log')
 
     def run(self):
         input = Dataset(self.input().path)
