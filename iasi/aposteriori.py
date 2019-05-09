@@ -11,11 +11,10 @@ import pandas as pd
 from luigi.util import requires
 from netCDF4 import Dataset
 
-from iasi.file import CopyNetcdfFile, ReadFile
-from iasi.util import CustomTask
+from iasi.file import CopyNetcdfFile, ReadFile, FileTask
 
 
-class AposterioriProcessing(CustomTask):
+class AposterioriProcessing(FileTask):
     # 5km height from above
     level_of_interest = luigi.IntParameter(default=-19)
     svd = luigi.BoolParameter()

@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import List, Dict
+from typing import Dict, List, Tuple
 
 import luigi
 import numpy as np
@@ -44,13 +44,9 @@ class CustomTask(luigi.Task):
     """Base luigi task which provides common attributes accessable by subclasses
 
     Attributes:
-        dst             base directory for output
-        log             write task logs to file
         force           remove output and run again
         force_upstream  recursively remove upstream input and run again
     """
-    dst = luigi.Parameter()
-    log = luigi.BoolParameter(significant=False, default=True)
     force = luigi.BoolParameter(significant=False, default=False)
     force_upstream = luigi.BoolParameter(significant=False, default=False)
 
@@ -73,41 +69,12 @@ class CustomTask(luigi.Task):
                 if len(tasks) == 0:
                     done = True
 
-    @luigi.Task.event_handler(luigi.Event.PROCESSING_TIME)
-    def callback_execution_time(self, execution_time):
-        logger.info('Task %s executeted in %s seconds', type(
-            self).__name__, str(execution_time))
 
     @luigi.Task.event_handler(luigi.Event.START)
     def callback_start(self):
         if hasattr(self, 'set_tracking_url') and callable(self.set_tracking_url):
             self.set_tracking_url(custom().tracking_url)
-        if self.log:
-            try:
-                # log file destination has to be implemented by concrete task
-                self.log_handler = logging.FileHandler(
-                    self.log_file(), mode='w')
-                self.log_handler.setFormatter(iasi.log_formatter)
-                logging.getLogger().addHandler(self.log_handler)
-            except NotImplementedError:
-                pass
         logger.info('Starting Task %s...', type(self).__name__)
-
-    @luigi.Task.event_handler(luigi.Event.SUCCESS)
-    def callback_success(self):
-        logger.info('Task %s successfully finished', type(self).__name__)
-        self._remove_log_hander()
-
-    @luigi.Task.event_handler(luigi.Event.FAILURE)
-    def callback_failure(self, error):
-        logger.error('Task %s failed', type(self).__name__)
-        logger.error('Message: %s', error)
-        self._remove_log_hander()
-
-    def _remove_log_hander(self):
-        if hasattr(self, 'log_handler'):
-            self.log_handler.close()
-            logging.getLogger().removeHandler(self.log_handler)
 
     def log_file(self):
         raise NotImplementedError

@@ -9,7 +9,7 @@ from sklearn.model_selection import ParameterGrid
 
 from iasi.composition import Composition
 from iasi.compression import CompressDataset, SelectSingleVariable, DecompressDataset
-from iasi.file import MoveVariables
+from iasi.file import MoveVariables, FileTask
 from iasi.metrics import Covariance
 from iasi.quadrant import Quadrant, AssembleFourQuadrants
 from iasi.util import CustomTask
@@ -18,7 +18,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class EvaluationTask(CustomTask):
+class EvaluationTask(FileTask):
     file = luigi.Parameter()
     gases = luigi.ListParameter()
     variables = luigi.ListParameter()
@@ -88,7 +88,7 @@ class EvaluationCompressionSize(EvaluationTask):
             df.to_csv(target, index=False)
 
 
-class EvaluationErrorEstimation(CustomTask):
+class EvaluationErrorEstimation(FileTask):
     file = luigi.Parameter()
     gases = luigi.Parameter()
     variables = luigi.Parameter()
@@ -125,7 +125,7 @@ class EvaluationErrorEstimation(CustomTask):
         return self.create_local_target('error-estimation', file=self.file, ext='csv')
 
 
-class VariableErrorEstimation(CustomTask):
+class VariableErrorEstimation(FileTask):
 
     file = luigi.Parameter()
     gas = luigi.Parameter()

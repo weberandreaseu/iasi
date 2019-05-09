@@ -1,14 +1,14 @@
+import logging
 import os
 import re
 
 import luigi
 from luigi import Config
 from luigi.util import common_params, inherits, requires
-# from iasi.compression import CompressDataset
-from netCDF4 import Dataset, Variable, Group
+from netCDF4 import Dataset, Group, Variable
 
-from iasi.util import CustomTask, child_variables_of, child_groups_of
-import logging
+import iasi
+from iasi.util import CustomTask, child_groups_of, child_variables_of
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,69 @@ class ReadFile(luigi.ExternalTask):
 
 
 @requires(ReadFile)
-class CopyNetcdfFile(CustomTask):
+class FileTask(CustomTask):
+    """Base class that operates on files.
+
+    Attributes:
+        file     input file
+        dst      base directory for output
+        log      write task logs to file
+    """
+    dst = luigi.Parameter()
+    log = luigi.BoolParameter(significant=False, default=False)
+
+    def output(self):
+        filename, _ = os.path.splitext(self.file)
+        file = filename + self.output_extension() if self.output_extension() else self.file
+        path = os.path(self.dst, self.output_directory(), file)
+        return luigi.LocalTarget(path=path)
+
+    def output_directory(self) -> str:
+        """This directory is used by output() and logging to specify
+        target of processed file.
+        """
+        raise NotImplementedError
+
+    def output_extension(self) -> str:
+        """Override this method if file extension of output differs from input file
+        """
+        return None
+
+    @luigi.Task.event_handler(luigi.Event.START)
+    def callback_start(self):
+        if self.log:
+            # log file destination has to be implemented by concrete task
+            path = os.path.join(self.output_directory(),
+                                self.output_extension())
+            self.log_handler = logging.FileHandler(path, mode='w')
+            self.log_handler.setFormatter(iasi.log_formatter)
+            logging.getLogger().addHandler(self.log_handler)
+        super(FileTask, self).callback_start()
+
+    @luigi.Task.event_handler(luigi.Event.PROCESSING_TIME)
+    def callback_execution_time(self, execution_time):
+        logger.info('Task %s executeted in %s seconds', type(
+            self).__name__, str(execution_time))
+
+    @luigi.Task.event_handler(luigi.Event.SUCCESS)
+    def callback_success(self):
+        logger.info('Task %s successfully finished', type(self).__name__)
+        self._remove_log_hander()
+
+    @luigi.Task.event_handler(luigi.Event.FAILURE)
+    def callback_failure(self, error):
+        logger.error('Task %s failed', type(self).__name__)
+        logger.error('Message: %s', error)
+        self._remove_log_hander()
+
+    def _remove_log_hander(self):
+        if hasattr(self, 'log_handler'):
+            self.log_handler.close()
+            logging.getLogger().removeHandler(self.log_handler)
+
+
+@requires(ReadFile)
+class CopyNetcdfFile(FileTask):
     """Luigi Task for copying netCDF files with a subset of variables
 
     Attributes:
@@ -98,7 +160,7 @@ class CopyNetcdfFile(CustomTask):
                 for name, dim in group.dimensions.items():
                     target_group.createDimension(
                         name, len(dim) if not dim.isunlimited() else None)
-        # create only dimensions in root 
+        # create only dimensions in root
         else:
             for name, dim in input.dimensions.items():
                 output.createDimension(
