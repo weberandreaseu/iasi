@@ -31,6 +31,7 @@ class Decomposition:
     def __init__(self, group: Group, variable: Variable, threshold: float = None):
         self.group = group
         self.var = variable
+        self.dimensions = dimensions_of(variable)
         self.threshold = threshold if threshold else self.default_threshold(
             group.name, variable.name)
 
@@ -46,8 +47,7 @@ class Decomposition:
         # if nothing else specified, return 1e-3
         return values.get((gas, var), 1e-3)
 
-    # TODO refactor: make methods signature more compact
-    def decompose(self, output: Dataset, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
+    def decompose(self, output: Dataset, levels: np.ma.MaskedArray) -> np.ma.MaskedArray:
         raise NotImplementedError
 
     def target_rank(self, eigenvalues: List) -> int:
@@ -84,7 +84,7 @@ class Decomposition:
 
 class SingularValueDecomposition(Decomposition):
 
-    def decompose(self, output: Dataset, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
+    def decompose(self, output: Dataset, levels: np.ma.MaskedArray) -> np.ma.MaskedArray:
         q: Quadrant = Quadrant.for_assembly(self.group.name, self.var.name, self.var)
         events, upper_bound, lower_bound = q.transformed_shape()
         # tranformed shape 1: (e, gl, gl), 2: (e, 2*gl, gl), 4:(e, 2* gl, 2*gl)
@@ -144,7 +144,7 @@ class SingularValueDecomposition(Decomposition):
 
 class EigenDecomposition(Decomposition):
 
-    def decompose(self, output: Dataset, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
+    def decompose(self, output: Dataset, levels: np.ma.MaskedArray) -> np.ma.MaskedArray:
         q: Quadrant = Quadrant.for_assembly(self.group.name, self.var.name, self.var)
         events, _, bound = q.transformed_shape()
         # should be always the same because reshaped variable is square

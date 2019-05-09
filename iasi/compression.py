@@ -68,7 +68,7 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
                 try:
                     dec = Decomposition.factory(group, var, self.threshold)
                     logger.info(f'Decompose {group.path}/{var.name}')
-                    dec.decompose(output, levels, dim_species, dim_levels)
+                    dec.decompose(output, levels)
                 except DecompositionException:
                     logger.info(
                         f'{group.path}/{var.name} cannot be decomposed. copy without compression')
