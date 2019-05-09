@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class CompressionParams(luigi.Config):
-    threshold = luigi.FloatParameter(default=1e-3)
+    threshold = luigi.FloatParameter(default=None)
 
 
 class CompressDataset(CompressionParams, CopyNetcdfFile):
@@ -42,7 +42,6 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
         input = Dataset(self.input().path)
         with self.output().temporary_path() as target:
             output = Dataset(target, 'w', format=self.format)
-            output.compression_threshold = self.threshold
             self.copy_dimensions(input, output, recursive=False)
             self.copy_variables(input, output)
             levels = input['atm_nol'][...]
@@ -59,10 +58,9 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
                 progress = int((counter / len(variables)) * 100)
                 self.set_progress_percentage(progress)
                 try:
-                    dec = Decomposition.factory(var, self.threshold)
+                    dec = Decomposition.factory(group, var, self.threshold)
                     logger.info(f'Decompose {group.path}/{var.name}')
-                    dec.decompose(output, group, var, levels,
-                                  dim_species, dim_levels)
+                    dec.decompose(output, levels, dim_species, dim_levels)
                 except DecompositionException:
                     logger.info(
                         f'{group.path}/{var.name} cannot be decomposed. copy without compression')
@@ -156,7 +154,9 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
             attribute = input[var_path]
             if isinstance(attribute, Group):
                 for var in attribute.variables.values():
-                    self.copy_variable(output, var, f'{attribute.path}/{var.name}', compressed=True)
+                    self.copy_variable(
+                        output, var, f'{attribute.path}/{var.name}', compressed=True)
             else:
                 assert isinstance(attribute, Variable)
-                self.copy_variable(output, attribute, var_path, compressed=True)
+                self.copy_variable(output, attribute,
+                                   var_path, compressed=True)

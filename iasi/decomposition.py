@@ -15,21 +15,39 @@ class DecompositionException(Exception):
 
 class Decomposition:
 
-    threshold = 1e-3
-
     @classmethod
-    def factory(cls, variable: Variable, threshold: float = 1e-3):
-        cls.threshold = threshold
+    def factory(cls, group: Group, variable: Variable, threshold: float = None):
+        """If threshold is provided, enforce threshold.
+        Else use default values provided by dict above
+        """
         # noise matrix (n) is symmetric and is qualified for EigenDecomposition
         if variable.name is 'n' and variable.dimensions[-2:] == ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
-            return EigenDecomposition(variable)
+            return EigenDecomposition(group, variable, threshold)
         if variable.dimensions[-2:] == ('atmospheric_grid_levels', 'atmospheric_grid_levels'):
-            return SingularValueDecomposition(variable)
+            return SingularValueDecomposition(group, variable, threshold)
         raise DecompositionException(
             f'Variable {variable.name} cannot be decomposed')
 
+    def __init__(self, group: Group, variable: Variable, threshold: float = None):
+        self.group = group
+        self.var = variable
+        self.threshold = threshold if threshold else self.default_threshold(
+            group.name, variable.name)
+
+    def default_threshold(self, gas: str, var: str) -> float:
+        values = {
+            ('WV'  , 'Tatmxavk'): 1e-2,
+            ('GHG' , 'Tatmxavk'): 1e-2,
+            ('HNO3', 'n')       : 1e-4,
+            ('HNO3', 'Tatmxavk'): 1e-2,
+            ('Tatm', 'avk')     : 1e-2,
+            ('Tatm', 'n')       : 1e-4
+        }
+        # if nothing else specified, return 1e-3
+        return values.get((gas, var), 1e-3)
+
     # TODO refactor: make methods signature more compact
-    def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
+    def decompose(self, output: Dataset, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
         raise NotImplementedError
 
     def target_rank(self, eigenvalues: List) -> int:
@@ -54,40 +72,40 @@ class Decomposition:
                 'event %d contains inf values in %s. skipping...', event, path)
             ok = False
         return ok
+    
+    def target_path(self) -> str:
+        return f'{self.group.path}/{self.var.name}/'
 
 
 class SingularValueDecomposition(Decomposition):
-    def __init__(self, variable: Variable):
-        self.var = variable
 
-    def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
-        q: Quadrant = Quadrant.for_assembly(group.name, var.name, var)
+    def decompose(self, output: Dataset, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
+        q: Quadrant = Quadrant.for_assembly(self.group.name, self.var.name, self.var)
         events, upper_bound, lower_bound = q.transformed_shape()
         # tranformed shape 1: (e, gl, gl), 2: (e, 2*gl, gl), 4:(e, 2* gl, 2*gl)
         all_U = np.ma.masked_all((events, upper_bound, lower_bound))
         all_s = np.ma.masked_all((events, lower_bound))
         all_Vh = np.ma.masked_all((events, lower_bound, lower_bound))
         all_k = np.ma.masked_all((events), dtype=np.int)
-        path = f'{group.path}/{var.name}/'
         max_k = 0
-        for event in range(var.shape[0]):
+        for event in range(self.var.shape[0]):
             if np.ma.is_masked(levels[event]) or levels.data[event] > 29:
                 continue
             # reduce array dimensions
             level = int(levels.data[event])
-            matrix = q.transform(var[event][...], level)
-            if not self.matrix_ok(event, path, matrix):
+            matrix = q.transform(self.var[event][...], level)
+            if not self.matrix_ok(event, self.target_path(), matrix):
                 continue
             # decompose reduced array
             U, s, Vh = np.linalg.svd(matrix.data, full_matrices=False)
             if np.iscomplex(U).any():
                 raise ValueError(
-                    f'Left-singuar values are complex for {path}:{event}')
+                    f'Left-singuar values are complex for {self.target_path()}:{event}')
             if np.iscomplex(s).any():
-                raise ValueError(f'Eigenvalues are complex for {path}:{event}')
+                raise ValueError(f'Eigenvalues are complex for {self.target_path()}:{event}')
             if np.iscomplex(Vh).any():
                 raise ValueError(
-                    f'Right-singlar values are complex for {path}:{event}')
+                    f'Right-singlar values are complex for {self.target_path()}:{event}')
             # find k eigenvalues
             k = self.target_rank(s)
             sigma = s[:k]
@@ -99,9 +117,9 @@ class SingularValueDecomposition(Decomposition):
             all_Vh[event][:k, :Vh.shape[1]] = Vh[:k, :]
         # write all to output
         upper_dim, lower_dim = q.upper_and_lower_dimension()
-        group = output.createGroup(path)
+        group = output.createGroup(self.target_path())
         group.createDimension('rank', size=max_k)
-        group.description = f'singular value decomposistion of {var.description}. reconstruction with (U * s).dot(Vh)'
+        group.description = f'singular value decomposistion of {self.var.description}. reconstruction with (U * s).dot(Vh)'
         k_out = group.createVariable('k', 'i1', ('event'))
         k_out[:] = all_k[:]
         k_out.description = 'target rank of decomposition (number of eigenvalues)'
@@ -120,42 +138,41 @@ class SingularValueDecomposition(Decomposition):
 
 
 class EigenDecomposition(Decomposition):
-    def __init__(self, variable: Variable):
-        self.var = variable
 
-    def decompose(self, output: Dataset, group: Group, var: Variable, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
-        q: Quadrant = Quadrant.for_assembly(group.name, var.name, var)
+    def decompose(self, output: Dataset, levels: np.ma.MaskedArray, dim_species, dim_levels) -> np.ma.MaskedArray:
+        q: Quadrant = Quadrant.for_assembly(self.group.name, self.var.name, self.var)
         events, _, bound = q.transformed_shape()
         # should be always the same because reshaped variable is square
         all_Q = np.ma.masked_all((events, bound, bound))
         all_s = np.ma.masked_all((events, bound))
         all_k = np.ma.masked_all((events))
-        path = f'{group.path}/{var.name}/'
         max_k = 0
-        for event in range(var.shape[0]):
+        for event in range(self.var.shape[0]):
             if np.ma.is_masked(levels[event]) or levels.data[event] > 29:
                 continue
             level = int(levels.data[event])
             # reduce array dimensions
-            matrix = q.transform(var[event][...], level)
-            if not self.matrix_ok(event, path, matrix):
+            matrix = q.transform(self.var[event][...], level)
+            if not self.matrix_ok(event, self.target_path(), matrix):
                 continue
             # test if nearlly symmetric
             matrix = matrix.data
             if not np.allclose(matrix, matrix.T):
-                raise ValueError(f'Noise matrix is not symmeric for {path}:{event}')
+                raise ValueError(
+                    f'Noise matrix is not symmeric for {self.target_path()}:{event}')
             # make matrix symmetric by fixing rounding errors
             matrix = (matrix + matrix.T) / 2
             # decompose matrix
             eigenvalues, eigenvectors = np.linalg.eig(matrix)
             # should not be complex anymore because matrix is symmetric (see above)
             if np.iscomplex(eigenvalues).any():
-                raise ValueError(f'Eigenvalues are complex for {path}:{event}')
+                raise ValueError(f'Eigenvalues are complex for {self.target_path()}:{event}')
             if np.iscomplex(eigenvectors).any():
-                raise ValueError(f'Eigenvectors are complex for {path}:{event}')
+                raise ValueError(
+                    f'Eigenvectors are complex for {self.target_path()}:{event}')
             # covarinace maticies are postive semi definite
             # this implies that eigenvalues are positive
-            # unfortuenately, due to floating point errors this is not garantueed 
+            # unfortuenately, due to floating point errors this is not garantueed
             # to address this problem we assume negative eigenpairs as negligible and filter them
             selected_eigenvalues = []
             selected_eigenvectors = []
@@ -168,13 +185,14 @@ class EigenDecomposition(Decomposition):
             max_k = max(k, max_k)
             selected_eigenvectors = np.array(selected_eigenvectors).T
             all_k[event] = k
-            all_Q[event][:selected_eigenvectors.shape[0], :k] = selected_eigenvectors[:, :k]
+            all_Q[event][:selected_eigenvectors.shape[0],
+                         :k] = selected_eigenvectors[:, :k]
             all_s[event][:k] = selected_eigenvalues
         # write all to output
         dimension_name, _ = q.upper_and_lower_dimension()
-        target_group = output.createGroup(path)
+        target_group = output.createGroup(self.target_path())
         target_group.createDimension('rank', size=max_k)
-        target_group.description = f'eigen decomposition of {var.description}. reconstruction with (Q * s).dot(Q.T)'
+        target_group.description = f'eigen decomposition of {self.var.description}. reconstruction with (Q * s).dot(Q.T)'
         k_out = target_group.createVariable('k', 'i1', ('event'))
         k_out[:] = all_k[:]
         k_out.description = 'target rank of decomposition (number of eigenvalues)'
