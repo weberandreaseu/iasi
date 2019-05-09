@@ -31,8 +31,12 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
         return MoveVariables(file=self.file, dst=self.dst, exclusion_pattern=None, force=self.force)
 
     def output(self):
-        path = self.create_local_path(
-            'compression', str(self.threshold), file=self.file)
+        if self.threshold:
+            path = self.create_local_path(
+                'compression', str(self.threshold), file=self.file)
+        else:
+            path = self.create_local_path('compression', file=self.file)
+
         return luigi.LocalTarget(path=path)
 
     def log_file(self):
