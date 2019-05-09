@@ -76,6 +76,11 @@ class Decomposition:
     def target_path(self) -> str:
         return f'{self.group.path}/{self.var.name}/'
 
+    def create_target_group(self, output: Dataset) -> Group:
+        group = output.createGroup(self.target_path())
+        group.eigenvalue_threshold = self.threshold
+        return group
+
 
 class SingularValueDecomposition(Decomposition):
 
@@ -117,7 +122,7 @@ class SingularValueDecomposition(Decomposition):
             all_Vh[event][:k, :Vh.shape[1]] = Vh[:k, :]
         # write all to output
         upper_dim, lower_dim = q.upper_and_lower_dimension()
-        group = output.createGroup(self.target_path())
+        group = self.create_target_group(output)
         group.createDimension('rank', size=max_k)
         group.description = f'singular value decomposistion of {self.var.description}. reconstruction with (U * s).dot(Vh)'
         k_out = group.createVariable('k', 'i1', ('event'))
@@ -190,7 +195,7 @@ class EigenDecomposition(Decomposition):
             all_s[event][:k] = selected_eigenvalues
         # write all to output
         dimension_name, _ = q.upper_and_lower_dimension()
-        target_group = output.createGroup(self.target_path())
+        target_group = self.create_target_group(output)
         target_group.createDimension('rank', size=max_k)
         target_group.description = f'eigen decomposition of {self.var.description}. reconstruction with (Q * s).dot(Q.T)'
         k_out = target_group.createVariable('k', 'i1', ('event'))
