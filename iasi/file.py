@@ -34,8 +34,9 @@ class FileTask(CustomTask):
     log = luigi.BoolParameter(significant=False, default=False)
 
     def output(self):
-        filename, _ = os.path.splitext(self.file)
-        file = filename + self.output_extension() if self.output_extension() else self.file
+        filename, extension = os.path.splitext(self.file)
+        _, filename = os.path.split(filename)
+        file = filename + (self.output_extension() if self.output_extension() else extension)
         path = os.path.join(self.dst, self.output_directory(), file)
         return luigi.LocalTarget(path=path)
 
@@ -54,6 +55,7 @@ class FileTask(CustomTask):
     def callback_start(self):
         if self.log:
             # log file destination has to be implemented by concrete task
+
             file = os.path.join(self.dst,
                                 self.output_directory(),
                                 self.output_extension())
