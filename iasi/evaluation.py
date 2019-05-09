@@ -67,8 +67,11 @@ class EvaluationTask(FileTask):
 class EvaluationCompressionSize(EvaluationTask):
     ancestor = 'CompressDataset'
 
-    def output(self):
-        return self.create_local_target('compression-summary', file=self.file, ext='csv')
+    def output_directory(self):
+        return 'compression-summary'
+
+    def output_extension(self):
+        return '.csv'
 
     def size_in_kb(self, file):
         return int(os.path.getsize(file) / (1000))
@@ -93,6 +96,12 @@ class EvaluationErrorEstimation(FileTask):
     gases = luigi.Parameter()
     variables = luigi.Parameter()
     thresholds = luigi.ListParameter(default=[1e-3])
+
+    def output_directory(self):
+        return 'error-estimation'
+
+    def output_extension(self):
+        return '.csv'
 
     def requires(self):
         parameter = {
@@ -120,9 +129,6 @@ class EvaluationErrorEstimation(FileTask):
                 report = report.append(task_report)
         with self.output().temporary_path() as target:
             report.to_csv(target, index=False)
-
-    def output(self):
-        return self.create_local_target('error-estimation', file=self.file, ext='csv')
 
 
 class VariableErrorEstimation(FileTask):
@@ -193,12 +199,8 @@ class VariableErrorEstimation(FileTask):
             variable_report.to_csv(target, index=False)
         original.close()
 
-    def output(self):
-        # one error estimation report for each gas
-        return self.create_local_target('error-estimation', self.gas, self.variable, file=self.file, ext='csv')
-
-    def log_file(self):
-        return self.create_local_path('error-estimation', self.gas, self.variable, file=self.file, ext='log')
+    def output_directory(self):
+        return os.path.join('error-estimation', self.gas, self.variable)
 
 
 class ErrorEstimation:
@@ -295,7 +297,8 @@ class ErrorEstimation:
                         # nol as index offset for error level
                         result['event'].append(event)
                         result['level_of_interest'].append(loi - 29)
-                        result['err'].append(error[level + nol_event, level + nol_event])
+                        result['err'].append(
+                            error[level + nol_event, level + nol_event])
                         result['rc_error'].append(rc_error)
                         result['type'].append(2 if calc_type_two else 1)
                 # stop if type 1 is calculated

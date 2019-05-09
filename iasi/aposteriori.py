@@ -31,9 +31,6 @@ class AposterioriProcessing(FileTask):
     def requires(self):
         raise NotImplementedError
 
-    def output(self):
-        raise NotImplementedError
-
     def run(self) -> pd.DataFrame:
         with Dataset(self.input().path, 'r') as nc:
             events = nc.dimensions['event'].size
@@ -129,8 +126,11 @@ class AposterioriProcessing(FileTask):
 
 # @requires(SingularValueDecomposition)
 class SvdAposteriori(AposterioriProcessing):
-    def output(self):
-        return self.create_local_target('aposteriori', 'svd', str(self.dim), file=self.file, ext='csv')
+    def output_directory(self):
+        return os.path.join('aposteriori', 'svd', str(self.dim))
+
+    def output_extention(self):
+        return '.csv'
 
     def reconstruct(self, dataset: Dataset):
         avk_U = dataset['state_WVatm_avk_U'][...]
@@ -157,8 +157,11 @@ class SvdAposteriori(AposterioriProcessing):
 
 
 class EigenAposteriori(AposterioriProcessing):
-    def output(self):
-        return self.create_local_target('aposteriori', 'eigen', str(self.dim), file=self.file, ext='csv')
+    def output_directory(self):
+        return os.path.join('aposteriori', 'eigen', str(self.dim))
+
+    def output_extention(self):
+        return '.csv'
 
     def reconstruct(self, dataset: Dataset):
         avk_Q = dataset['state_WVatm_avk_Q'][...]
@@ -183,8 +186,11 @@ class EigenAposteriori(AposterioriProcessing):
 
 @requires(ReadFile)
 class DirectAposteriori(AposterioriProcessing):
-    def output(self):
-        return self.create_local_target('aposteriori', 'direct', file=self.file, ext='csv')
+    def output_directory(self):
+        return os.path.join('aposteriori', 'direct')
+
+    def output_extention(self):
+        return '.csv'
 
     def reconstruct(self, dataset: Dataset):
         return dataset['state_WVatm_avk'][...]

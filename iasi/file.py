@@ -36,7 +36,7 @@ class FileTask(CustomTask):
     def output(self):
         filename, _ = os.path.splitext(self.file)
         file = filename + self.output_extension() if self.output_extension() else self.file
-        path = os.path(self.dst, self.output_directory(), file)
+        path = os.path.join(self.dst, self.output_directory(), file)
         return luigi.LocalTarget(path=path)
 
     def output_directory(self) -> str:
@@ -54,9 +54,11 @@ class FileTask(CustomTask):
     def callback_start(self):
         if self.log:
             # log file destination has to be implemented by concrete task
-            path = os.path.join(self.output_directory(),
+            file = os.path.join(self.dst,
+                                self.output_directory(),
                                 self.output_extension())
-            self.log_handler = logging.FileHandler(path, mode='w')
+            os.makedirs(self.output_directory(), exist_ok=True)
+            self.log_handler = logging.FileHandler(file, mode='w')
             self.log_handler.setFormatter(iasi.log_formatter)
             logging.getLogger().addHandler(self.log_handler)
         super(FileTask, self).callback_start()
@@ -140,9 +142,6 @@ class CopyNetcdfFile(FileTask):
         'state_Tskin2WVatm_xavk'      :'/state/WV/Tskinxavk'
     }
 
-    def output(self):
-        return self.create_local_target(file=self.file)
-
     def run(self):
         input = Dataset(self.input().path, 'r')
         with self.output().temporary_path() as target:
@@ -196,5 +195,5 @@ class CopyNetcdfFile(FileTask):
 class MoveVariables(CopyNetcdfFile):
     "Create a copy of netCDF file with variables organized in subgroups"
 
-    def output(self):
-        return self.create_local_target('groups', file=self.file)
+    def output_directory(self):
+        return 'groups'

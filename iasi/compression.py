@@ -30,20 +30,10 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
     def requires(self):
         return MoveVariables(file=self.file, dst=self.dst, exclusion_pattern=None, force=self.force)
 
-    def output(self):
+    def output_directory(self):
         if self.threshold:
-            path = self.create_local_path(
-                'compression', str(self.threshold), file=self.file)
-        else:
-            path = self.create_local_path('compression', file=self.file)
-
-        return luigi.LocalTarget(path=path)
-
-    def log_file(self):
-        if self.threshold:
-            return self.create_local_path('compression', str(self.threshold), file=self.file, ext='log')
-        else:
-            return self.create_local_path('compression', file=self.file, ext='log')
+            return os.path.join('compression', str(self.threshold))
+        return 'compression'
 
     def run(self):
         input = Dataset(self.input().path)
@@ -84,22 +74,10 @@ class DecompressDataset(CompressionParams, CopyNetcdfFile):
     # exclude variables starting with state
     exclusion_pattern = r'\/?state\S*'
 
-    # TODO refactor
-    def output(self):
+    def output_directory(self):
         if self.threshold:
-            path = self.create_local_path(
-                'decompression', str(self.threshold), file=self.file)
-        else:
-            path = self.create_local_path('decompression', file=self.file)
-
-        return luigi.LocalTarget(path=path)
-
-    # TODO refactor
-    def log_file(self):
-        if self.threshold:
-            return self.create_local_path('decompression', str(self.threshold), file=self.file, ext='log')
-        else:
-            return self.create_local_path('decompression', file=self.file, ext='log')
+            return os.path.join('decompression', str(self.threshold))
+        return 'decompression'
 
     def run(self):
         input = Dataset(self.input().path)
@@ -150,14 +128,14 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
         raise ValueError(
             f'Undefined ancestor {self.ancestor} for variable selection')
 
-    def output(self):
+    def output_directory(self):
         var = f'{self.gas}/{self.variable}' if self.gas else self.variable
         if self.ancestor == 'MoveVariables':
-            return self.create_local_target('single', 'original', var, str(self.threshold), file=self.file)
+            return os.path.join('single', 'original', var, str(self.threshold))
         if self.ancestor == 'CompressDataset':
-            return self.create_local_target('single', 'compressed', var, str(self.threshold), file=self.file)
+            return os.path.join('single', 'compressed', var, str(self.threshold))
         if self.ancestor == 'DecompressDataset':
-            return self.create_local_target('single', 'decompressed', var, str(self.threshold), file=self.file)
+            return os.path.join('single', 'decompressed', var, str(self.threshold))
         raise ValueError(f'Undefined ancestor {self.ancestor}')
 
     def run(self):

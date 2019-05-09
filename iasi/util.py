@@ -75,25 +75,3 @@ class CustomTask(luigi.Task):
         if hasattr(self, 'set_tracking_url') and callable(self.set_tracking_url):
             self.set_tracking_url(custom().tracking_url)
         logger.info('Starting Task %s...', type(self).__name__)
-
-    def log_file(self):
-        raise NotImplementedError
-
-    def create_local_path(self, *args: str, file: str, ext: str = None) -> str:
-        _, filename = os.path.split(file)
-        if ext:
-            name, _ = os.path.splitext(filename)
-            filename = f'{name}.{ext}'
-        path = os.path.join(self.dst, *args)
-        os.makedirs(path, exist_ok=True)
-        return os.path.join(path, filename)
-
-    def create_local_target(self, *args: str, file: str, ext: str = None) -> luigi.LocalTarget:
-        _, filename = os.path.split(file)
-        if ext:
-            name, _ = os.path.splitext(filename)
-            filename = f'{name}.{ext}'
-        path = os.path.join(self.dst, *args, filename)
-        target = luigi.LocalTarget(path)
-        target.makedirs()
-        return target
