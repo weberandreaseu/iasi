@@ -13,6 +13,12 @@ from iasi.util import CustomTask, child_groups_of, child_variables_of
 logger = logging.getLogger(__name__)
 
 
+def filename_by(path: str) -> str:
+    _, file = os.path.split(path)
+    filename, _ = os.path.splitext(file)
+    return filename
+
+
 class ReadFile(luigi.ExternalTask):
     """Basic class for reading a local file as input for a luigi task."""
     file = luigi.Parameter()
@@ -36,7 +42,8 @@ class FileTask(CustomTask):
     def output(self):
         filename, extension = os.path.splitext(self.file)
         _, filename = os.path.split(filename)
-        file = filename + (self.output_extension() if self.output_extension() else extension)
+        file = filename + (self.output_extension()
+                           if self.output_extension() else extension)
         path = os.path.join(self.dst, self.output_directory(), file)
         return luigi.LocalTarget(path=path)
 
@@ -55,10 +62,10 @@ class FileTask(CustomTask):
     def callback_start(self):
         if self.log:
             # log file destination has to be implemented by concrete task
-
+            filename = filename_by(self.file)
             file = os.path.join(self.dst,
                                 self.output_directory(),
-                                self.output_extension())
+                                filename + '.log')
             os.makedirs(self.output_directory(), exist_ok=True)
             self.log_handler = logging.FileHandler(file, mode='w')
             self.log_handler.setFormatter(iasi.log_formatter)

@@ -15,7 +15,7 @@ class TestEvaluation(unittest.TestCase):
             force=True,
             gases=['WV', 'GHG', 'HNO3', 'Tatm'],
             variables=['avk', 'n', 'Tatmxavk'],
-            log=False
+            log=True
         )
         assert luigi.build([task], local_scheduler=True)
 
@@ -40,7 +40,8 @@ class TestEvaluation(unittest.TestCase):
             dst='/tmp/iasi',
             force_upstream=True,
             gases=['WV', 'GHG', 'HNO3', 'Tatm'],
-            variables=['avk', 'n', 'Tatmxavk']
+            variables=['avk', 'n', 'Tatmxavk'],
+            log=True
         )
         assert luigi.build([task], local_scheduler=True)
         with task.output().open() as file:
