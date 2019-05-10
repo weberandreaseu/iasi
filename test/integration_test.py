@@ -1,8 +1,11 @@
 import unittest
-from test_precision import TestCompareDecompressionResult
-from iasi import DecompressDataset, MoveVariables
+
 import luigi
 from netCDF4 import Dataset
+
+from iasi import DecompressDataset
+from iasi.file import MoveVariables
+from test_precision import TestCompareDecompressionResult
 
 
 class IntegrationTest(TestCompareDecompressionResult):
