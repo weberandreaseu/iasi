@@ -7,9 +7,15 @@ import pandas as pd
 import seaborn as sns
 from netCDF4 import Dataset
 from typing import Tuple, List
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.pipeline import Pipeline
+from sklearn.cluster import DBSCAN
+import glob
 
 Coordinate = Tuple[float, float]
 CoordinateRange = Tuple[float, float]
+
+features = ['lat', 'lon', 'H2O', 'delD']
 
 
 class GeographicArea:
@@ -25,39 +31,81 @@ class GeographicArea:
         self.lat = lat
         self.lon = lon
 
-    def filter_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        return df[(df.lon.between(*self.lon)) & (df.lat.between(self.lat[1], self.lat[0]))]
+    def import_dataset(self, file_pattern: str) -> pd.DataFrame:
+        frames = []
+        for file in glob.glob(file_pattern):
+            frame = pd.DataFrame()
+            with Dataset(file) as nc:
+                for feature in features:
+                    var = nc[feature][...]
+                    assert not var.mask.any()
+                    frame[feature] = var.data
+            # filter to given area
+            frame = frame[(frame.lon.between(*self.lon)) &
+                          (frame.lat.between(self.lat[1], self.lat[0]))]
+            frames.append(frame)
+        return pd.concat(frames, ignore_index=True)
 
     def get_extend(self) -> List:
         return [*self.lon, *self.lat]
 
 
-def import_dataset(file: str) -> pd.DataFrame:
-    columns = ['lat', 'lon', 'H2O', 'delD']
-    df = pd.DataFrame()
-    with Dataset(file) as nc:
-        for column in columns:
-            var = nc[column][...]
-            assert not var.mask.any()
-            if column == 'H2O':
-                # H2O should be transformed to log scale
-                df[column] = np.log(var.data)
-            else:
-                df[column] = var.data
-    return df
+class SpatialWaterVapourScaler(BaseEstimator, TransformerMixin):
+    """Scale water vapour features including latitude and longitude:
+    - 1 degree lat = 111.00 km
+    - 1 degree lon = 110.57 km (at equator)
+    source: https://www.thoughtco.com/degree-of-latitude-and-longitude-distance-4070616
+    """
+
+    def __init__(self, delD=10, H2O=0.1, km=60):
+        self.delD = delD
+        self.H2O = H2O
+        self.km = km
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        """Scale 4 water vapour features according to transform parameters
+
+        order of colums:
+        - lat
+        - lon
+        - H2O
+        - delD
+        """
+        assert X.shape[1] == 4
+        # lat
+        X[:, 0] = (X[:, 0] * 111) / self.km
+        # lon
+        X[:, 1] = (X[:, 1] * 110.57) / self.km
+        # H2O
+        X[:, 2] = np.log(X[:, 2]) / self.H2O
+        # delD
+        X[:, 3] = X[:, 3] / self.delD
+        return X
 
 
 # %%
 area = GeographicArea(lat=(50, -25), lon=(-45, 60))
+df = area.import_dataset('data/input/METOPAB_20160625_global_evening.nc')
+scaler = SpatialWaterVapourScaler()
+# scaled = pd.DataFrame(scaler.transform(df.values))
+clustering = DBSCAN(eps=1.5, min_samples=10)
+pipeline = Pipeline([
+    ('scaler', scaler),
+    ('clustering', clustering)
+])
+samples = df
+pipeline.fit(samples[features].values)
+clustering = pipeline.named_steps['clustering']
+samples['label'] = clustering.labels_
+
 
 # %%
-df = import_dataset('data/input/METOPAB_20160625_global_evening.nc')
-df = area.filter_dataframe(df)
-
-# %%
-y = df['delD']
-x = df['H2O']
-plt.scatter(x, y, alpha=0.1)
+y = samples['delD']
+x = np.log(samples['H2O'])
+plt.scatter(x, y, alpha=0.25, c=samples['label'])
 plt.ylabel('delD')
 plt.xlabel('ln[H2O]')
 plt.show()
@@ -67,5 +115,5 @@ plt.show()
 ax = plt.axes(projection=ccrs.PlateCarree())
 ax.set_extent(area.get_extend(), crs=ccrs.PlateCarree())
 ax.coastlines()
-ax.scatter(df.lon, df.lat, s=4)
+ax.scatter(samples.lon, samples.lat, alpha=0.25, c=samples['label'])
 plt.show()
