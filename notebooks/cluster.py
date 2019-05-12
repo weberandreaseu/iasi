@@ -1,16 +1,18 @@
 # %%
 
+import glob
+from typing import List, Tuple
+
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from netCDF4 import Dataset
-from typing import Tuple, List
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.pipeline import Pipeline
 from sklearn.cluster import DBSCAN
-import glob
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 Coordinate = Tuple[float, float]
 CoordinateRange = Tuple[float, float]
@@ -89,7 +91,7 @@ class SpatialWaterVapourScaler(BaseEstimator, TransformerMixin):
 # %%
 area = GeographicArea(lat=(50, -25), lon=(-45, 60))
 df = area.import_dataset('data/input/METOPAB_20160625_global_evening.nc')
-scaler = SpatialWaterVapourScaler()
+scaler = SpatialWaterVapourScaler(km=120, H2O=0.2, delD=5)
 # scaled = pd.DataFrame(scaler.transform(df.values))
 clustering = DBSCAN(eps=1.5, min_samples=10)
 pipeline = Pipeline([
@@ -105,9 +107,9 @@ samples['label'] = clustering.labels_
 # %%
 y = samples['delD']
 x = np.log(samples['H2O'])
-plt.scatter(x, y, alpha=0.25, c=samples['label'])
+plt.scatter(x, y, alpha=0.15, marker='.', s=8, c=samples['label'])
 plt.ylabel('delD')
-plt.xlabel('ln[H2O]')
+plt.xlabel('ln[H2O]') 
 plt.show()
 
 
@@ -115,5 +117,5 @@ plt.show()
 ax = plt.axes(projection=ccrs.PlateCarree())
 ax.set_extent(area.get_extend(), crs=ccrs.PlateCarree())
 ax.coastlines()
-ax.scatter(samples.lon, samples.lat, alpha=0.25, c=samples['label'])
+ax.scatter(samples.lon, samples.lat, alpha=0.65, marker='.', s=8, c=samples['label'])
 plt.show()
