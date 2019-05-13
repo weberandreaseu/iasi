@@ -50,7 +50,7 @@ composer.reconstruct(number_of_levels, target=target_dataset)
 target_dataset.close()
 ```
 
-The reconstruction API automatically discovers the decomposition type (Singular Value Decomposition or Eigen Decomposition) automatically by the group name.
+The reconstruction API automatically discovers the decomposition type (Singular Value Decomposition or Eigen Decomposition) by the group name.
 You may reconstruct matrices manually, but you should be careful:
 The reconstruction depends on decomposition type and dimensionality.
 The following snippet outlines the manual reconstruction of a single measurement of water vapour's averaging kernel.
@@ -88,25 +88,57 @@ print('Reconstructed kernel after reshape (single event):', rc.shape)
 __To avoid pitfalls we recommend using the `iais.Composition` module!__
 
 
-### Permanent Decompression of a whole Dataset
-
-If you like to avoid 
-
-To manage processing of files, this project uses [Luigi](https://github.com/spotify/luigi/).
+### Command Line Interface
+This project manages processing of files with [Luigi](https://github.com/spotify/luigi/).
 Processing steps are implemented as [Luigi Tasks](https://luigi.readthedocs.io/en/stable/tasks.html).
-To start the luigi server run:
+For task execution you need the luigi task scheduler, which can be stated typing
 ```
 luigid
 ```
-The backend should be available at [http://localhost:8082/](http://localhost:8082/).
+The schedulers backend should be available at [http://localhost:8082/](http://localhost:8082/).
 
-To schedule a task e.g. `DeltaDRetrieval` run following command with your custom arguments:
+For testing purpose you can also pass `--local-scheduler` as a task parameter.
+
+Tasks can be scheduled using command line interface...
 
 ```
-python -m luigi --module iasi DeltaDRetrieval \
-    --file ./test/resources/IASI-test-single-event.nc \
-    --dst ./data \
-    --svd 
+python -m luigi --module iasi TaskName --task-param1 a --task-param2 b [--local-scheduler]
+```
+
+...or python module
+```
+import luigi
+from iasi import TaskName
+task = TaskName(task_param1='a', task_param2='b)
+luigi.build([task], local_scheduler=True)
 ```
 
 For further details have a look at the [Luigi Documentation](https://luigi.readthedocs.io/).
+
+#### Decompression of a Dataset
+
+```
+python -m luigi --module iasi DecompressDataset \
+    --file ./test/resources/IASI-test-single-event.nc \
+    --dst ./data \
+    --compress-upstream 
+```
+
+If `--compress-upstream` is set, the file is first compressed and then decompressed.
+
+#### Compression of a Dataset
+
+```
+python -m luigi --module iasi CompressDataset \
+    --file ./test/resources/IASI-test-single-event.nc \
+    --dst ./data 
+```
+
+#### Common Task Parameters
+
+- `--file`: file to process
+- `--dst`: destination directory for task output
+- `--force`: delete task output and execute again
+- `--force-upstream`: delete all intermediate task output (excluding `--file`)
+- `--log`: log task output to a file with
+
