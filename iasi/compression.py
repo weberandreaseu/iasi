@@ -59,7 +59,7 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
                     logger.info(f'Decompose {group.path}/{var.name}')
                     dec.decompose(output, levels)
                 except DecompositionException:
-                    logger.info(
+                    logger.debug(
                         f'{group.path}/{var.name} cannot be decomposed. copy without compression')
                     self.copy_variable(output, var, f'{group.path}/{var.name}')
                 counter += 1

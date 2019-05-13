@@ -72,7 +72,6 @@ class FileTask(CustomTask):
             self.log_handler = logging.FileHandler(file, mode='w')
             self.log_handler.setFormatter(iasi.log_formatter)
             logging.getLogger().addHandler(self.log_handler)
-        super(FileTask, self).callback_start()
 
     @luigi.Task.event_handler(luigi.Event.PROCESSING_TIME)
     def callback_execution_time(self, execution_time):
