@@ -11,7 +11,7 @@ from scipy import linalg
 
 from iasi.composition import Composition, CompositionException
 from iasi.decomposition import Decomposition, DecompositionException
-from iasi.file import CopyNetcdfFile, MoveVariables
+from iasi.file import CopyNetcdfFile, MoveVariables, ReadFile
 from iasi.quadrant import Quadrant
 from iasi.util import child_groups_of, child_variables_of
 
@@ -69,7 +69,11 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
 
 class DecompressDataset(CompressionParams, CopyNetcdfFile):
 
+    compress_upstream = luigi.BoolParameter(default=False)
+
     def requires(self):
+        if self.compress_upstream:
+            return ReadFile(file=self.file)
         return CompressDataset(file=self.file, dst=self.dst, threshold=self.threshold)
 
     def output_directory(self):
