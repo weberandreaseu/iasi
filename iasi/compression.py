@@ -73,8 +73,8 @@ class DecompressDataset(CompressionParams, CopyNetcdfFile):
 
     def requires(self):
         if self.compress_upstream:
-            return ReadFile(file=self.file)
-        return CompressDataset(file=self.file, dst=self.dst, threshold=self.threshold)
+            return CompressDataset(file=self.file, dst=self.dst, threshold=self.threshold)
+        return ReadFile(file=self.file)
 
     def output_directory(self):
         if self.threshold:
