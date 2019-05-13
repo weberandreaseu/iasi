@@ -65,7 +65,9 @@ class SingularValueComposition(Composition):
         s_all = self.s[...]
         Vh_all = self.Vh[...]
         for event in range(self.Vh.shape[0]):
-            if np.ma.is_masked(nol[event]) or nol.data[event] > 29 or np.ma.is_masked(k_all):
+            if np.ma.is_masked(nol[event]) or nol.data[event] > 29:
+                continue
+            if np.ma.is_masked(k_all[event]) or k_all.data[event] <= 0:
                 continue
             level = int(nol.data[event])
             k = k_all.data[event]
@@ -100,7 +102,9 @@ class EigenComposition(Composition):
         s_all = self.s[...]
         k_all = self.k[...]
         for event in range(self.Q.shape[0]):
-            if np.ma.is_masked(nol[event]) or nol.data[event] > 29 or np.ma.is_masked(k_all[event]):
+            if np.ma.is_masked(nol[event]) or nol.data[event] > 29:
+                continue
+            if np.ma.is_masked(k_all[event]) or k_all.data[event] <= 0:
                 continue
             level = int(nol.data[event])
             k = k_all.data[event]

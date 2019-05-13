@@ -25,7 +25,7 @@ class CompressionParams(luigi.Config):
 class CompressDataset(CompressionParams, CopyNetcdfFile):
 
     def requires(self):
-        return MoveVariables(file=self.file, dst=self.dst, force=self.force)
+        return MoveVariables(file=self.file, dst=self.dst)
 
     def output_directory(self):
         if self.threshold:
@@ -40,7 +40,7 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
             # exclude variables starting with state
             self.copy_variables(
                 input, output, exclusion_pattern=r'\/?state\S*')
-            # TOOD refactor
+            # TODO refactor
             levels = input['atm_nol'][...]
             dim_levels = input.dimensions['atmospheric_grid_levels'].size
             dim_species = input.dimensions['atmospheric_species'].size
@@ -67,8 +67,10 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
             output.close()
 
 
-@requires(CompressDataset)
 class DecompressDataset(CompressionParams, CopyNetcdfFile):
+
+    def requires(self):
+        return CompressDataset(file=self.file, dst=self.dst, threshold=self.threshold)
 
     def output_directory(self):
         if self.threshold:
