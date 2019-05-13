@@ -59,14 +59,17 @@ class TestCompareDecompressionResult(unittest.TestCase):
         for group, var in child_variables_of(self.uncompressed['state']):
             path = os.path.join(group.path, var.name)
             # test only reconstructed variables
-            if var.name not in ['avk', 'Tatmxavk', 'n']:
+            if var.name not in ['avk', 'Tatmxavk', 'n'] or group.name in ['Tskin']:
                 continue
             original = var[...]
             reconstructed = self.compressed[path][...]
-            same_mask = np.equal(original.mask, reconstructed.mask).all()
-            self.assertTrue(
-                same_mask, f'reconstruced mask is not equal for {path}')
-            close = np.ma.allclose(original, reconstructed, atol=1e-2)
-            self.assertTrue(
-                close, f'reconstruction values are not close for {path}')
-            logger.debug('All variables are close for %s', path)
+            for event in range(original.shape[0]):
+                same_mask = np.equal(
+                    original[event].mask, reconstructed[event].mask).all()
+                self.assertTrue(
+                    same_mask, f'reconstruced mask is not equal for {path} at {event}')
+                close = np.ma.allclose(
+                    original[event], reconstructed[event], atol=1e-2)
+                self.assertTrue(
+                    close, f'reconstruction values are not close for {path} at {event}')
+                logger.debug('All variables are close for %s', path)
