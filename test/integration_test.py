@@ -15,12 +15,12 @@ class IntegrationTest(TestCompareDecompressionResult):
         compression = DecompressDataset(
             file=file,
             dst='/tmp/iasi',
-            force=True
+            force_upstream=True
         )
         uncompressed = MoveVariables(
             file=file,
             dst='/tmp/iasi',
-            force=True
+            force_upstream=True
         )
         assert luigi.build([compression, uncompressed], local_scheduler=True)
         cls.compressed = Dataset(compression.output().path)
