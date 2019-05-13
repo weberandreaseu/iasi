@@ -358,7 +358,6 @@ class WaterVapour(ErrorEstimation):
         P = covariance.traf()
         if type2:
             # type 2 error
-            # TODO verify correct transformation
             C = covariance.c_by_avk(avk)
             original_type2 = C @ P @ original @ P.T @ C.T
             if reconstruced is None:
@@ -416,7 +415,6 @@ class GreenhouseGas(ErrorEstimation):
     def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         assert not type2
         if reconstructed is None:
-            # TODO: what is the ideal cross averaging kernel?
             # original error
             s_cov = covariance.assumed_covariance(species=1)
             return original @ s_cov @ original.T

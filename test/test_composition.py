@@ -14,13 +14,6 @@ from iasi.composition import (Composition, EigenComposition,
 from iasi.compression import CompressDataset
 from iasi.file import MoveVariables
 
-# TODO project wide logging configuration
-handler = logging.StreamHandler(stream=sys.stdout)
-handler.setLevel(logging.DEBUG)
-logger = logging.getLogger(__name__)
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
-
 
 class TestComposition(unittest.TestCase):
     @classmethod

@@ -15,7 +15,6 @@ thresholds = [1e-5, 1e-4, 1e-3, 1e-2, 0]
 
 
 def altitude_by(level_of_interest: int):
-    # TODO verify altitudes by mattias
     map = {
         -6: '22.1 km',
         -19: '4.2 km',
