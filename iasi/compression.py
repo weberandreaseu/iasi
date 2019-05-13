@@ -24,11 +24,8 @@ class CompressionParams(luigi.Config):
 
 class CompressDataset(CompressionParams, CopyNetcdfFile):
 
-    # exclude variables starting with state
-    exclusion_pattern = r'\/?state\S*'
-
     def requires(self):
-        return MoveVariables(file=self.file, dst=self.dst, exclusion_pattern=None, force=self.force)
+        return MoveVariables(file=self.file, dst=self.dst, force=self.force)
 
     def output_directory(self):
         if self.threshold:
@@ -40,7 +37,9 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
         with self.output().temporary_path() as target:
             output = Dataset(target, 'w', format=self.format)
             self.copy_dimensions(input, output, recursive=False)
-            self.copy_variables(input, output)
+            # exclude variables starting with state
+            self.copy_variables(
+                input, output, exclusion_pattern=r'\/?state\S*')
             # TOOD refactor
             levels = input['atm_nol'][...]
             dim_levels = input.dimensions['atmospheric_grid_levels'].size
@@ -71,9 +70,6 @@ class CompressDataset(CompressionParams, CopyNetcdfFile):
 @requires(CompressDataset)
 class DecompressDataset(CompressionParams, CopyNetcdfFile):
 
-    # exclude variables starting with state
-    exclusion_pattern = r'\/?state\S*'
-
     def output_directory(self):
         if self.threshold:
             return os.path.join('decompression', str(self.threshold))
@@ -84,7 +80,9 @@ class DecompressDataset(CompressionParams, CopyNetcdfFile):
         with self.output().temporary_path() as target:
             output = Dataset(target, 'w', format=self.format)
             self.copy_dimensions(input, output, recursive=False)
-            self.copy_variables(input, output)
+            # exclude variables starting with state
+            self.copy_variables(
+                input, output, exclusion_pattern=r'\/?state\S*')
             levels = input['atm_nol'][...]
             groups = list(child_groups_of(input['state']))
             counter = 0
@@ -106,7 +104,7 @@ class DecompressDataset(CompressionParams, CopyNetcdfFile):
 
 
 class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
-    gas = luigi.Parameter(default=None)
+    gas = luigi.Parameter(default='')
     variable = luigi.Parameter()
     ancestor = luigi.Parameter(default='MoveVariables')
 

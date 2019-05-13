@@ -12,12 +12,12 @@ class TestCopyNetcdf(unittest.TestCase):
 
     file = 'test/resources/IASI-test-single-event.nc'
 
+    @unittest.skip('not supported')
     def test_exclude_state(self):
         task = MoveVariables(
             file='test/resources/MOTIV-single-event.nc',
             dst='/tmp/iasi/exclude',
             # any non whitespace string starting with state
-            exclusion_pattern=r'\/?state\S*',
             force=True,
             log=False
         )

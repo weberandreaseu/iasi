@@ -101,10 +101,8 @@ class CopyNetcdfFile(FileTask):
     """Luigi Task for copying netCDF files with a subset of variables
 
     Attributes:
-        exclusion_pattern   variables matching pattern are excluded
         format              used netCDF format
     """
-    exclusion_pattern = luigi.Parameter(default=None)
     format = luigi.Parameter(default='NETCDF4')
 
     mapping = {
@@ -186,7 +184,7 @@ class CopyNetcdfFile(FileTask):
         out_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
         out_var[:] = var[:]
 
-    def copy_variables(self, input: Dataset, output: Dataset) -> None:
+    def copy_variables(self, input: Dataset, output: Dataset, exclusion_pattern=None) -> None:
         input_variables = list(child_variables_of(input))
         counter = 0
         for group, var in input_variables:
@@ -195,7 +193,7 @@ class CopyNetcdfFile(FileTask):
                 path = var.name
             else:
                 path = f'{group.path}/{var.name}'
-            if self.exclusion_pattern and re.match(self.exclusion_pattern, path):
+            if exclusion_pattern and re.match(exclusion_pattern, path):
                 continue
             message = f'Copying variable {counter} of {len(input_variables)} {path}'
             self.set_status_message(message)
