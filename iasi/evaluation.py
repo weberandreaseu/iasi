@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 class EvaluationTask(FileTask):
-    file = luigi.Parameter()
     gases = luigi.ListParameter()
     variables = luigi.ListParameter()
     threshold_values = luigi.ListParameter(default=[1e-2, 1e-3, 1e-4, 1e-5])
@@ -30,8 +29,6 @@ class EvaluationTask(FileTask):
             'ancestor': [self.ancestor],
             'file': [self.file],
             'dst': [self.dst],
-            'force': [self.force],
-            'force_upstream': [self.force_upstream],
             'threshold': self.threshold_values,
             'gas': self.gases,
             'variable': self.variables
@@ -44,8 +41,6 @@ class EvaluationTask(FileTask):
             'ancestor': ['MoveVariables'],
             'file': [self.file],
             'dst': [self.dst],
-            'force': [self.force],
-            'force_upstream': [self.force_upstream],
             'threshold': [0],
             'gas': self.gases,
             'variable': self.variables
@@ -60,7 +55,7 @@ class EvaluationTask(FileTask):
             task.variable == 'Tatmxavk'), single_variables)
         return {
             'single': filtered,
-            'original': MoveVariables(dst=self.dst, file=self.file, force=self.force, force_upstream=self.force_upstream)
+            'original': MoveVariables(dst=self.dst, file=self.file)
         }
 
 
@@ -107,8 +102,6 @@ class EvaluationErrorEstimation(FileTask):
         parameter = {
             'file': [self.file],
             'dst': [self.dst],
-            'force': [self.force],
-            'force_upstream': [self.force_upstream],
             'thresholds': [self.thresholds],
             'gas': self.gases,
             'variable': self.variables,
@@ -133,7 +126,6 @@ class EvaluationErrorEstimation(FileTask):
 
 class VariableErrorEstimation(FileTask):
 
-    file = luigi.Parameter()
     gas = luigi.Parameter()
     variable = luigi.Parameter()
     thresholds = luigi.ListParameter(default=[1e-3])
@@ -143,15 +135,9 @@ class VariableErrorEstimation(FileTask):
             dst=self.dst,
             file=self.file,
             threshold=threshold,
-            force=self.force,
-            force_upstream=self.force_upstream,
             log=self.log
         ) for threshold in self.thresholds]
-        original = MoveVariables(dst=self.dst,
-                                 file=self.file,
-                                 log=self.log,
-                                 force=self.force,
-                                 force_upstream=self.force_upstream)
+        original = MoveVariables(dst=self.dst, file=self.file, log=self.log)
         return {
             'compressed': compressed,
             'original': original
