@@ -93,9 +93,9 @@ This project manages processing of files with [Luigi](https://github.com/spotify
 Processing steps are implemented as [Luigi Tasks](https://luigi.readthedocs.io/en/stable/tasks.html).
 For task execution you need the luigi task scheduler, which can be stated typing
 ```
-luigid
+luigid --logdir luigi-logs --background
 ```
-The schedulers backend should be available at [http://localhost:8082/](http://localhost:8082/).
+The schedulers backend should be available at [http://localhost:8082/](http://localhost:8082/). You can stop luigi with `killall luigid`.
 
 For testing purpose you can also pass `--local-scheduler` as a task parameter.
 
