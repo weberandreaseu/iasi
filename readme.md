@@ -85,7 +85,7 @@ rc = np.array([
 print('Reconstructed kernel after reshape (single event):', rc.shape)
 
 ```
-__To avoid pitfalls we recommend using the `iais.Composition` module!__
+__To avoid pitfalls we recommend using the `iasi.Composition` module!__
 
 
 ### Command Line Interface
@@ -119,7 +119,7 @@ For further details have a look at the [Luigi Documentation](https://luigi.readt
 
 ```
 python -m luigi --module iasi DecompressDataset \
-    --file ./test/resources/IASI-test-single-event.nc \
+    --file ./test/resources/MOTIV-single-event.nc \
     --dst ./data \
     --compress-upstream 
 ```
@@ -130,7 +130,7 @@ If `--compress-upstream` is set, the file is first compressed and then decompres
 
 ```
 python -m luigi --module iasi CompressDataset \
-    --file ./test/resources/IASI-test-single-event.nc \
+    --file ./test/resources/MOTIV-single-event.nc \
     --dst ./data 
 ```
 
