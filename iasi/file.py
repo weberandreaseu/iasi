@@ -37,7 +37,7 @@ class FileTask(CustomTask):
         log      write task logs to file
     """
     dst = luigi.Parameter()
-    log = luigi.BoolParameter(significant=False, default=False)
+    log_file = luigi.BoolParameter(significant=False, default=False)
 
     def output(self):
         filename, extension = os.path.splitext(self.file)
@@ -60,7 +60,7 @@ class FileTask(CustomTask):
 
     @luigi.Task.event_handler(luigi.Event.START)
     def callback_start(self):
-        if self.log:
+        if self.log_file:
             # log file destination has to be implemented by concrete task
             filename = filename_by(self.file)
             file = os.path.join(self.dst,

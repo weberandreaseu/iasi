@@ -14,7 +14,7 @@ class TestCompression(unittest.TestCase):
             dst='/tmp/iasi',
             force=True,
             threshold=0.01,
-            log=False
+            log_file=False
         )
         assert luigi.build([task], local_scheduler=True)
         with Dataset(task.output().path) as nc:
@@ -28,7 +28,8 @@ class TestCompression(unittest.TestCase):
             file='test/resources/MOTIV-single-event.nc',
             dst='/tmp/iasi',
             force=True,
-            log=False
+            log_file=False,
+            compress_upstream=True
         )
         success = luigi.build([task], local_scheduler=True)
         self.assertTrue(success)

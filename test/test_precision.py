@@ -25,13 +25,14 @@ class TestCompareDecompressionResult(unittest.TestCase):
             file=file,
             dst='/tmp/iasi',
             force_upstream=True,
-            log=False
+            log_file=False,
+            compress_upstream=True
         )
         uncompressed = MoveVariables(
             file=file,
             dst='/tmp/iasi',
             force_upstream=True,
-            log=False
+            log_file=False
         )
         assert luigi.build([compression, uncompressed], local_scheduler=True)
         cls.compressed = Dataset(compression.output().path)

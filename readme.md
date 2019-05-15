@@ -140,5 +140,5 @@ python -m luigi --module iasi CompressDataset \
 - `--dst`: destination directory for task output
 - `--force`: delete task output and execute again
 - `--force-upstream`: delete all intermediate task output (excluding `--file`)
-- `--log`: log task output to a file with
+- `--log-file`: log task output to a file into destination directory
 

@@ -19,7 +19,7 @@ class TestCopyNetcdf(unittest.TestCase):
             dst='/tmp/iasi/exclude',
             # any non whitespace string starting with state
             force=True,
-            log=False
+            log_file=False
         )
         assert luigi.build([task], local_scheduler=True)
         with Dataset(task.output().path, 'r') as nc:
@@ -33,7 +33,7 @@ class TestCopyNetcdf(unittest.TestCase):
             file='test/resources/MOTIV-single-event.nc',
             dst='/tmp/iasi/copy',
             force=True,
-            log=False
+            log_file=False
         )
         success = luigi.build([task], local_scheduler=True)
         self.assertTrue(success)
@@ -110,7 +110,7 @@ class TestCopyNetcdf(unittest.TestCase):
             force_upstream=True,
             variable='state/WV/avk',
             ancestor=ancestor,
-            log=False
+            log_file=False
         ) for ancestor in ['MoveVariables', 'CompressDataset', 'DecompressDataset']]
         assert luigi.build(tasks, local_scheduler=True)
         # output from move variables (uncompressed)

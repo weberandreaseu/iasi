@@ -105,7 +105,7 @@ class EvaluationErrorEstimation(FileTask):
             'thresholds': [self.thresholds],
             'gas': self.gases,
             'variable': self.variables,
-            'log': [self.log]
+            'log_file': [self.log_file]
         }
         parameter_grid = ParameterGrid(parameter)
         # exclude cross average kernel from atmospheric temperature.
@@ -135,9 +135,11 @@ class VariableErrorEstimation(FileTask):
             dst=self.dst,
             file=self.file,
             threshold=threshold,
-            log=self.log
+            log_file=self.log_file,
+            compress_upstream=True
         ) for threshold in self.thresholds]
-        original = MoveVariables(dst=self.dst, file=self.file, log=self.log)
+        original = MoveVariables(
+            dst=self.dst, file=self.file, log_file=self.log_file)
         return {
             'compressed': compressed,
             'original': original
@@ -315,7 +317,7 @@ class WaterVapour(ErrorEstimation):
     def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         # in this method, avk should be same like original
         if not np.allclose(original, avk):
-            logger.warn('There are differences in original paarmeter and avk')
+            logger.warn('There are differences in original parameter and avk')
         if type2:
             # type 2 error
             original_type2 = covariance.type2_of(original)

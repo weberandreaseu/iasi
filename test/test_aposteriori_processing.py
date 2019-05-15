@@ -12,7 +12,7 @@ class TestAposterioriProcessing(unittest.TestCase):
             file='test/resources/IASI-test-single-event.nc',
             dst='/tmp/iasi',
             force=True,
-            log=False
+            log_file=False
         )
         success = luigi.build([task], local_scheduler=True)
         self.assertTrue(success)
@@ -27,7 +27,7 @@ class TestAposterioriProcessing(unittest.TestCase):
             dst='/tmp/iasi',
             force=True,
             dim=6,
-            log=False
+            log_file=False
         )
         success = luigi.build([task], local_scheduler=True)
         self.assertTrue(success)
@@ -42,7 +42,7 @@ class TestAposterioriProcessing(unittest.TestCase):
             dst='/tmp/iasi',
             force=True,
             dim=12,
-            log=False
+            log_file=False
         )
         success = luigi.build([task], local_scheduler=True)
         self.assertTrue(success)
