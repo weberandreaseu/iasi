@@ -20,35 +20,6 @@ class TestAposterioriProcessing(unittest.TestCase):
             df = pd.read_csv(file)
             self.verify_results(df)
 
-    @unittest.skip
-    def test_svd_retrieval(self):
-        task = SvdAposteriori(
-            file='test/resources/IASI-test-single-event.nc',
-            dst='/tmp/iasi',
-            force=True,
-            dim=6,
-            log_file=False
-        )
-        success = luigi.build([task], local_scheduler=True)
-        self.assertTrue(success)
-        with task.output().open('r') as file:
-            df = pd.read_csv(file)
-            self.verify_results(df)
-
-    @unittest.skip('eigen retrieval is not precise enough')
-    def test_eigen_retrieval(self):
-        task = EigenAposteriori(
-            file='test/resources/IASI-test-single-event.nc',
-            dst='/tmp/iasi',
-            force=True,
-            dim=12,
-            log_file=False
-        )
-        success = luigi.build([task], local_scheduler=True)
-        self.assertTrue(success)
-        with task.output().open('r') as file:
-            df = pd.read_csv(file)
-            self.verify_results(df)
 
     def verify_results(self, df: pd.DataFrame) -> None:
         # test shape
