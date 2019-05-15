@@ -15,8 +15,8 @@ The thesis has two main contributions:
 
 ### Setup
 
-1. Create a virtual environment: `python -m venv venv`
-1. Activate virtual environment: `source venv/bin/activate`
+1. Create a virtual environment: `python -m venv myvenv`
+1. Activate virtual environment: `source myvenv/bin/activate`
 1. Install dependencies: `pip install -r requirements.txt`
 1. (Optional) Run unit tests: `python -m unittest discover -v -s ./test`
 
@@ -24,7 +24,7 @@ The thesis has two main contributions:
 ### Data Reconstruction API
 
 For simple reconstruction of compressed data we provide `iasi.Composition` module.
-The following minimal example demonstrates the reconstruction of Water Vapour Averaging Kernel:
+The following minimal example demonstrates the reconstruction of water vapour averaging kernel:
 
 ```python
 from netCDF4 import Dataset
@@ -88,50 +88,58 @@ print('Reconstructed kernel after reshape (single event):', rc.shape)
 __To avoid pitfalls we recommend using the `iasi.Composition` module!__
 
 
-### Command Line Interface
+### Task Execution
+
 This project manages processing of files with [Luigi](https://github.com/spotify/luigi/).
 Processing steps are implemented as [Luigi Tasks](https://luigi.readthedocs.io/en/stable/tasks.html).
 For task execution you need the luigi task scheduler, which can be stated typing
 ```
 luigid --logdir luigi-logs --background
 ```
-The schedulers backend should be available at [http://localhost:8082/](http://localhost:8082/). You can stop luigi with `killall luigid`.
-
+The luigi scheduler backend should be available at [http://localhost:8082/](http://localhost:8082/). You can stop luigi with `killall luigid`.
 For testing purpose you can also pass `--local-scheduler` as a task parameter.
-
-Tasks can be scheduled using command line interface...
-
-```
-python -m luigi --module iasi TaskName --task-param1 a --task-param2 b [--local-scheduler]
-```
-
-...or python module
-```
-import luigi
-from iasi import TaskName
-task = TaskName(task_param1='a', task_param2='b)
-luigi.build([task], local_scheduler=True)
-```
 
 For further details have a look at the [Luigi Documentation](https://luigi.readthedocs.io/).
 
 #### Decompression of a Dataset
 
+Using command line interface
+
 ```
 python -m luigi --module iasi DecompressDataset \
-    --file ./test/resources/MOTIV-single-event.nc \
+    --file ./test/resources/MOTIV-single-event-compressed.nc \
     --dst ./data \
-    --compress-upstream 
+    [--local-scheduler]
 ```
 
-If `--compress-upstream` is set, the file is first compressed and then decompressed.
+Using python module
+
+```python
+import luigi
+from iasi import DecompressDataset
+task = DecompressDataset(file='test/resources/MOTIV-single-event-compressed.nc', dst='data')
+luigi.build([task], local_scheduler=True)
+```
+
+If you pass the boolean parameter `compress-upstream`, the file specified with `file` is first compressed and then decompressed.
 
 #### Compression of a Dataset
+
+Using command line interface
 
 ```
 python -m luigi --module iasi CompressDataset \
     --file ./test/resources/MOTIV-single-event.nc \
-    --dst ./data 
+    --dst ./data \
+    [--local-scheduler]
+```
+
+Using python module
+```python
+import luigi
+from iasi import CompressDataset
+task = DecompressDataset(file='test/resources/MOTIV-single-event.nc', dst='data')
+luigi.build([task], local_scheduler=True)
 ```
 
 #### Common Task Parameters
@@ -140,5 +148,5 @@ python -m luigi --module iasi CompressDataset \
 - `--dst`: destination directory for task output
 - `--force`: delete task output and execute again
 - `--force-upstream`: delete all intermediate task output (excluding `--file`)
-- `--log-file`: log task output to a file into destination directory
+- `--log-file`: log task output to a file into destination directory (log file is automatically created)
 
