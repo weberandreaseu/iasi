@@ -15,7 +15,8 @@ class IntegrationTest(TestCompareDecompressionResult):
         compression = DecompressDataset(
             file=file,
             dst='/tmp/iasi',
-            force_upstream=True
+            force_upstream=True,
+            compress_upstream=True
         )
         uncompressed = MoveVariables(
             file=file,

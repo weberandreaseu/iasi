@@ -25,7 +25,7 @@ class CompressionParams(luigi.Config):
 class CompressDataset(CompressionParams, CopyNetcdfFile):
 
     def requires(self):
-        return MoveVariables(file=self.file, dst=self.dst)
+        return MoveVariables(file=self.file, dst=self.dst, log_file=self.log_file)
 
     def output_directory(self):
         if self.threshold:
@@ -73,7 +73,7 @@ class DecompressDataset(CompressionParams, CopyNetcdfFile):
 
     def requires(self):
         if self.compress_upstream:
-            return CompressDataset(file=self.file, dst=self.dst, threshold=self.threshold)
+            return CompressDataset(file=self.file, dst=self.dst, threshold=self.threshold, log_file=self.log_file)
         return ReadFile(file=self.file)
 
     def output_directory(self):
@@ -121,13 +121,16 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
             return CompressDataset(
                 dst=self.dst,
                 file=self.file,
-                threshold=self.threshold
+                threshold=self.threshold,
+                log_file=self.log_file
             )
         if self.ancestor == "DecompressDataset":
             return DecompressDataset(
                 dst=self.dst,
                 file=self.file,
-                threshold=self.threshold
+                threshold=self.threshold,
+                log_file=self.log_file,
+                compress_upstream=True
             )
         raise ValueError(
             f'Undefined ancestor {self.ancestor} for variable selection')

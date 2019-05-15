@@ -24,13 +24,13 @@ class TestComposition(unittest.TestCase):
             file=file,
             dst='/tmp/iasi',
             force=True,
-            log=False
+            log_file=False
         )
         uncompressed = MoveVariables(
             file=file,
             dst='/tmp/iasi',
             force=True,
-            log=False
+            log_file=False
         )
         assert luigi.build([compression, uncompressed], local_scheduler=True)
         cls.compressed = Dataset(compression.output().path)
