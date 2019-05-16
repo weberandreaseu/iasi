@@ -92,14 +92,16 @@ __To avoid pitfalls we recommend using the `iasi.Composition` module!__
 
 This project manages processing of files with [Luigi](https://github.com/spotify/luigi/).
 Processing steps are implemented as [Luigi Tasks](https://luigi.readthedocs.io/en/stable/tasks.html).
-For task execution you need the luigi task scheduler, which can be stated typing
+For task execution you need the luigi task scheduler, which can be started typing
 ```
 luigid --logdir luigi-logs --background
 ```
 The luigi scheduler backend should be available at [http://localhost:8082/](http://localhost:8082/). You can stop luigi with `killall luigid`.
 For testing purpose you can also pass `--local-scheduler` as a task parameter.
+Luigi configuration settings are in [luigi.cfg](luigi.cfg)
 
 For further details have a look at the [Luigi Documentation](https://luigi.readthedocs.io/).
+
 
 #### Decompression of a Dataset
 
@@ -109,7 +111,8 @@ Using command line interface
 python -m luigi --module iasi DecompressDataset \
     --file ./test/resources/MOTIV-single-event-compressed.nc \
     --dst ./data \
-    [--local-scheduler]
+    [--local-scheduler] \
+    [--workers 1]
 ```
 
 Using python module
@@ -118,7 +121,7 @@ Using python module
 import luigi
 from iasi import DecompressDataset
 task = DecompressDataset(file='test/resources/MOTIV-single-event-compressed.nc', dst='data')
-luigi.build([task], local_scheduler=True)
+luigi.build([task], local_scheduler=True, workers=1)
 ```
 
 If you pass the boolean parameter `compress-upstream`, the file specified with `file` is first compressed and then decompressed.
@@ -131,15 +134,16 @@ Using command line interface
 python -m luigi --module iasi CompressDataset \
     --file ./test/resources/MOTIV-single-event.nc \
     --dst ./data \
-    [--local-scheduler]
+    [--local-scheduler] \
+    [--workers 1]
 ```
 
 Using python module
 ```python
 import luigi
 from iasi import CompressDataset
-task = DecompressDataset(file='test/resources/MOTIV-single-event.nc', dst='data')
-luigi.build([task], local_scheduler=True)
+task = CompressDataset(file='test/resources/MOTIV-single-event.nc', dst='data')
+luigi.build([task], local_scheduler=True, workers=1)
 ```
 
 #### Common Task Parameters
