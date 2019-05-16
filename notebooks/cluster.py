@@ -13,6 +13,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.cluster import DBSCAN
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from netCDF4 import Dataset
 
 Coordinate = Tuple[float, float]
 CoordinateRange = Tuple[float, float]
@@ -102,14 +103,53 @@ samples = df
 pipeline.fit(samples[features].values)
 clustering = pipeline.named_steps['clustering']
 samples['label'] = clustering.labels_
+# filter outliers
+samples = samples[samples.label != -1]
+
+# %%
 
 
+class SaveClusterGroups:
+
+    def __init__(self, H2O_bins=15, delD_bins=20):
+        self.H2O_bins = H2O_bins
+        self.delD_bins = delD_bins
+
+    def create_dataset(self, filename) -> Dataset:
+        nc = Dataset(filename, 'w', format='NETCDF4')
+        nc.createDimension('H20_bins', self.H2O_bins)
+        nc.createDimension('delD_bins', self.delD_bins)
+        # unlimted clusters
+        nc.createDimension('cluster', None)
+        nc.createVariable('cluster', 'u4', ('cluster', 'delD_bins',  'H20_bins'))
+        return nc
+
+    def save(self, df: pd.DataFrame, filename='cluster.nc'):
+        assert -1 not in df.label
+        with self.create_dataset(filename) as nc:
+            cluster = nc['cluster']
+            for group, data in df.groupby(['label']):
+                hist, xedges, yedges = np.histogram2d(
+                    data['H2O'].values, data['delD'].values, bins=(self.H2O_bins, self.delD_bins))
+                cluster[group] = hist.T
+
+
+cluster_groups = SaveClusterGroups()
+cluster_groups.save(samples)
+
+
+# %%
+nc = Dataset('cluster.nc')
+cluster_hist = nc['cluster'][...]
+plt.imshow(cluster_hist[8], interpolation='nearest', origin='low')
+plt.colorbar()
+plt.show()
 # %%
 y = samples['delD']
 x = np.log(samples['H2O'])
 plt.scatter(x, y, alpha=0.15, marker='.', s=8, c=samples['label'])
 plt.ylabel('delD')
-plt.xlabel('ln[H2O]') 
+plt.xlabel('ln[H2O]')
 plt.show()
 
 
@@ -117,5 +157,6 @@ plt.show()
 ax = plt.axes(projection=ccrs.PlateCarree())
 ax.set_extent(area.get_extend(), crs=ccrs.PlateCarree())
 ax.coastlines()
-ax.scatter(samples.lon, samples.lat, alpha=0.65, marker='.', s=8, c=samples['label'])
+ax.scatter(samples.lon, samples.lat, alpha=0.65,
+           marker='.', s=8, c=samples['label'])
 plt.show()
