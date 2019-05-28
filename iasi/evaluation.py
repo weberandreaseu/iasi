@@ -1,3 +1,4 @@
+from functools import partial
 import math
 import os
 
@@ -154,13 +155,14 @@ class VariableErrorEstimation(FileTask):
         nol = original['atm_nol'][...]
         alt = original['atm_altitude'][...]
         avk = original['/state/WV/avk'][...]
+        alt_tropo = original['tropopause_altitude'][...]
         counter = 0
         message = f'Calculate original error for {path}: {counter}/{len(tasks_and_input)}'
         logger.info(message)
         self.set_status_message(message)
         self.set_progress_percentage(int(counter / len(tasks_and_input) * 100))
         error_estimation: ErrorEstimation = ErrorEstimation.factory(
-            self.gas, nol, alt, avk)
+            self.gas, nol, alt, avk, alt_tropo=alt_tropo)
         # calculation of original error
         variable_report = error_estimation.report_for(
             original[path], original[path][...], None, rc_error=False)
@@ -195,23 +197,24 @@ class ErrorEstimation:
     levels_of_interest = []
 
     @staticmethod
-    def factory(gas: str, nol, alt, avk):
+    def factory(gas: str, nol, alt, avk, alt_tropo=None):
         if gas == 'WV':
-            return WaterVapour(gas, nol, alt, avk, type_two=True)
+            return WaterVapour(gas, nol, alt, avk, alt_tropo, type_two=True)
         if gas == 'GHG':
-            return GreenhouseGas(gas, nol, alt)
+            return GreenhouseGas(gas, nol, alt, alt_tropo)
         if gas == 'HNO3':
-            return NitridAcid(gas, nol, alt)
+            return NitridAcid(gas, nol, alt, alt_tropo)
         if gas == 'Tatm':
-            return AtmosphericTemperature(gas, nol, alt)
+            return AtmosphericTemperature(gas, nol, alt, alt_tropo)
         raise ValueError(f'No error estimation implementation for gas {gas}')
 
-    def __init__(self, gas, nol, alt, type_two=False):
+    def __init__(self, gas, nol, alt, alt_tropo, type_two=False):
         # each gas may have multiple levels of interest
         self.type_two = type_two
         self.nol = nol
         self.alt = alt
         self.gas = gas
+        self.alt_tropo = alt_tropo
 
     def report_for(self, variable: Variable, original, reconstructed, rc_error) -> pd.DataFrame:
         # if not original.shape == reconstructed.shape:
@@ -240,7 +243,8 @@ class ErrorEstimation:
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
             nol_event = self.nol.data[event]
-            covariance = Covariance(nol_event, self.alt[event])
+            covariance = Covariance(
+                nol_event, self.alt[event], alt_tropo=self.alt_tropo)
             original_event = reshaper.transform(original[event], nol_event)
             if original_event.mask.any():
                 logger.warn('Original array contains masked values')
@@ -309,11 +313,12 @@ class ErrorEstimation:
 class WaterVapour(ErrorEstimation):
     levels_of_interest = [-6, -16, -19]
 
-    def __init__(self, gas, nol, alt, avk, type_two=True):
-        super().__init__(gas, nol, alt, type_two=type_two)
+    def __init__(self, gas, nol, alt, avk, alt_tropo, type_two=True):
+        super().__init__(gas, nol, alt, alt_tropo, type_two=type_two)
         self.avk = avk
 
     # for each method type one and type two
+
     def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         # in this method, avk should be same like original
         if not np.allclose(original, avk):
@@ -338,6 +343,8 @@ class WaterVapour(ErrorEstimation):
             else:
                 # type 1 reconstruction error
                 rc_type1 = covariance.type1_of(reconstructed)
+                # _calc_Sa_(covariance.nol, covariance.alt,
+                #           covariance.alt[0], None, alt_strat=25000)
                 return covariance.smoothing_error(original_type1, rc_type1)
 
     def noise_matrix(self, original: np.ndarray, reconstruced: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
