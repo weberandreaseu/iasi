@@ -11,9 +11,9 @@ import seaborn as sns
 from netCDF4 import Dataset
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.cluster import DBSCAN
+from sklearn.metrics import davies_bouldin_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from netCDF4 import Dataset
 
 Coordinate = Tuple[float, float]
 CoordinateRange = Tuple[float, float]
@@ -51,6 +51,12 @@ class GeographicArea:
 
     def get_extend(self) -> List:
         return [*self.lon, *self.lat]
+
+    def scatter(self, *args, **kwargs):
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        ax.set_extent([*self.lon, *self.lat], crs=ccrs.PlateCarree())
+        ax.coastlines()
+        ax.scatter(*args, **kwargs)
 
 
 class SpatialWaterVapourScaler(BaseEstimator, TransformerMixin):
@@ -93,7 +99,7 @@ class SpatialWaterVapourScaler(BaseEstimator, TransformerMixin):
 area = GeographicArea(lat=(50, -25), lon=(-45, 60))
 df = area.import_dataset('data/input/METOPAB_20160625_global_evening.nc')
 scaler = SpatialWaterVapourScaler(km=120, H2O=0.2, delD=5)
-# scaled = pd.DataFrame(scaler.transform(df.values))
+scaled = pd.DataFrame(scaler.transform(df.values), columns=features)
 clustering = DBSCAN(eps=1.5, min_samples=10)
 pipeline = Pipeline([
     ('scaler', scaler),
@@ -103,8 +109,10 @@ samples = df
 pipeline.fit(samples[features].values)
 clustering = pipeline.named_steps['clustering']
 samples['label'] = clustering.labels_
+scaled['label'] = clustering.labels_
 # filter outliers
 samples = samples[samples.label != -1]
+scaled = scaled[scaled.label != -1]
 
 # %%
 
@@ -121,7 +129,8 @@ class SaveClusterGroups:
         nc.createDimension('delD_bins', self.delD_bins)
         # unlimted clusters
         nc.createDimension('cluster', None)
-        nc.createVariable('cluster', 'u4', ('cluster', 'delD_bins',  'H20_bins'))
+        nc.createVariable(
+            'cluster', 'u4', ('cluster', 'delD_bins',  'H20_bins'))
         return nc
 
     def save(self, df: pd.DataFrame, filename='cluster.nc'):
@@ -144,6 +153,7 @@ cluster_hist = nc['cluster'][...]
 plt.imshow(cluster_hist[8], interpolation='nearest', origin='low')
 plt.colorbar()
 plt.show()
+
 # %%
 y = samples['delD']
 x = np.log(samples['H2O'])
@@ -154,9 +164,7 @@ plt.show()
 
 
 # %%
-ax = plt.axes(projection=ccrs.PlateCarree())
-ax.set_extent(area.get_extend(), crs=ccrs.PlateCarree())
-ax.coastlines()
-ax.scatter(samples.lon, samples.lat, alpha=0.65,
-           marker='.', s=8, c=samples['label'])
+area.scatter(samples.lon, samples.lat, alpha=0.65,
+             marker='.', s=8, c=samples['label'], cmap='nipy_spectral')
+plt.savefig('cluster.pdf')
 plt.show()
