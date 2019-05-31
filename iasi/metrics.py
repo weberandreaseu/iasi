@@ -126,6 +126,8 @@ class Covariance:
             amp_H2O = 0.3
             amp_dD = 0.06
             sigma = f_sigma * 6000.
+        else:
+            raise ValueError('Invalid altitude')
 
         return amp_H2O, amp_dD, sigma
 
