@@ -5,8 +5,8 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 from netCDF4 import Dataset
 
 import matplotlib
-plt.switch_backend('PDF')
-matplotlib.use('PDF')
+# plt.switch_backend('PDF')
+# matplotlib.use('PDF')
 
 # plt.rc('font', family='Linux Libertine')
 # plt.rc('font',**{'family':'sans-serif','sans-serif':['Modern Computer'], 'serif':['Linux Libertine']})
