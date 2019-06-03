@@ -48,14 +48,36 @@ for i in range(nol):
         a_CH4[i] = 250
 
 # HNO3
-a_HNO3 = np.ndarray((nol, nol))
+a_HNO3 = np.ndarray((nol))
+for i in range(nol):
 
-# sa_HNO3 = assumed_covariance(None, sig * 1.2)
+    # surface is more than 4km below tropopause
+    # if alt[0] < alt_trop - 4000:
+    # TODO: template is strage here. ask for feedback
+    if alt[i] < alt_trop - 4000:
+        a_HNO3[i] = 2400 + (alt[i] - alt[0]) * \
+            ((1200 - 2400)/(alt_trop - 4000 - alt[0]))
+    if alt_trop - 4000 <= alt[i] < alt_trop + 8000:
+        a_HNO3[i] = 1200
+    if alt_trop + 8000 <= alt[i] < 50000:
+        a_HNO3[i] = 1200 + (alt[i] - (alt_trop + 8000)) * \
+            ((300-1200) / (50000 - (alt_trop + 8000)))
+    if alt[i] >= 50000:
+        a_HNO3[i] = 3000
+    # else:
+    #     pass
+
+sa_HNO3 = assumed_covariance(a_HNO3, sig * 1.2)
 sa_CH4 = assumed_covariance(a_CH4, sig * 0.6)
 
 
-plt.imshow(sa_CH4)
+plt.imshow(sa_HNO3)
 plt.show()
+
+
+# %%
+# plt.plot(sig)
+plt.plot(a_HNO3)
 
 
 # %%
