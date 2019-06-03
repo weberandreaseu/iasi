@@ -2,6 +2,10 @@
 % kmtrop = alt_tropopause
 % kmstrat= alt_stratosphere
 
+
+% create sigma with std and scale
+% - CH4: sigma * 0.6
+% - HNO3: sigma * 1.2
 for i=1:+1:numlev,
     if km(i)<kmtrop,
         sigma(i)=2.5+(km(i)-km(1))*((5-2.5)/(kmtrop-km(1))); 
