@@ -106,7 +106,11 @@ class SingularValueDecomposition(Decomposition):
             if not self.matrix_ok(event, self.target_path(), matrix):
                 continue
             # decompose reduced array
-            U, s, Vh = np.linalg.svd(matrix.data, full_matrices=False)
+            try:
+                U, s, Vh = np.linalg.svd(matrix.data, full_matrices=False)
+            except np.linalg.LinAlgError as err:
+                logger.error(f'{err} at {self.target_path()}:{event}')
+                raise err
             if np.iscomplex(U).any():
                 raise ValueError(
                     f'Left-singuar values are complex for {self.target_path()}:{event}')
