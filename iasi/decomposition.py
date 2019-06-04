@@ -72,9 +72,9 @@ class Decomposition:
             logger.warning(
                 'event %d contains inf values in %s. skipping...', event, path)
             ok = False
-        if np.all(matrix == 0):
+        if np.allclose(matrix, 0, atol=1e-14):
             logger.warning(
-                'event %d contains zero values in %s. skipping...', event, path)
+                'event %d contains zero or close to zero values in %s. skipping...', event, path)
             ok = False
         return ok
     
