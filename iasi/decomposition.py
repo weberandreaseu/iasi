@@ -71,6 +71,10 @@ class Decomposition:
             logger.warning(
                 'event %d contains inf values in %s. skipping...', event, path)
             ok = False
+        if np.all(matrix == 0):
+            logger.warning(
+                'event %d contains zero values in %s. skipping...', event, path)
+            ok = False
         return ok
     
     def target_path(self) -> str:
@@ -191,7 +195,7 @@ class EigenDecomposition(Decomposition):
             selected_eigenvectors = np.array(selected_eigenvectors).T
             all_k[event] = k
             all_Q[event][:selected_eigenvectors.shape[0],
-                         :k] = selected_eigenvectors[:, :k]
+                            :k] = selected_eigenvectors[:, :k]
             all_s[event][:k] = selected_eigenvalues
         # write all to output
         dimension_name, _ = q.upper_and_lower_dimension()
