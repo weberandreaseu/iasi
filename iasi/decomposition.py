@@ -5,6 +5,7 @@ import numpy as np
 from netCDF4 import Dataset, Group, Variable
 from iasi.quadrant import Quadrant
 from iasi.util import dimensions_of
+import scipy.linalg as la
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,7 @@ class SingularValueDecomposition(Decomposition):
                 continue
             # decompose reduced array
             try:
-                U, s, Vh = np.linalg.svd(matrix.data, full_matrices=False)
+                U, s, Vh = la.svd(matrix.data, full_matrices=False, lapack_driver='gesdd')
             except np.linalg.LinAlgError as err:
                 logger.error(f'{err} at {self.target_path()}:{event}')
                 raise err
