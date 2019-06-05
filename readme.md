@@ -123,6 +123,17 @@ from iasi import DecompressDataset
 task = DecompressDataset(file='test/resources/MOTIV-single-event-compressed.nc', dst='data')
 luigi.build([task], local_scheduler=True, workers=1)
 ```
+Decompressing multiple files
+
+```python
+import glob
+import luigi
+from iasi import DecompressDataset
+
+files = glob.glob('src/of/files/*.nc')
+tasks = [DecompressDataset(file=file, dst='data') for file in files]
+luigi.build(tasks, local_scheduler=True, workers=1)
+```
 
 If you pass the boolean parameter `compress-upstream`, the file specified with `file` is first compressed and then decompressed.
 
