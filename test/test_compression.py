@@ -1,9 +1,12 @@
+import datetime
 import unittest
 
 import luigi
 import numpy as np
 from netCDF4 import Dataset
-from iasi.compression import CompressDataset, DecompressDataset
+
+from iasi.compression import (CompressDataset, CompressDateRange,
+                              DecompressDataset)
 
 
 class TestCompression(unittest.TestCase):
@@ -33,3 +36,12 @@ class TestCompression(unittest.TestCase):
         )
         success = luigi.build([task], local_scheduler=True)
         self.assertTrue(success)
+
+
+class TestDateInterval(unittest.TestCase):
+
+    def test_date_range(self):
+        # end date is not inclusive
+        interval = luigi.date_interval.Custom.parse('2016-06-01-2016-06-30')
+        task = CompressDateRange(date_interval=interval, dst='/tmp/iasi', src='test/resources')
+        luigi.build([task], local_scheduler=True)
