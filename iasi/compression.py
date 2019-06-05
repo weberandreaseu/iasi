@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 from math import ceil
@@ -164,3 +165,19 @@ class SelectSingleVariable(CompressionParams, CopyNetcdfFile):
                 assert isinstance(attribute, Variable)
                 self.copy_variable(output, attribute,
                                    var_path, compressed=True)
+
+
+class CompressDateRange(luigi.WrapperTask):
+
+    date_interval = luigi.DateIntervalParameter()
+    src = luigi.Parameter()
+    dst = luigi.Parameter()
+
+    def requires(self):
+        files = []
+        for date in self.date_interval:
+            pattern = f"METOP?_{date.strftime('%Y%m%d')}*.nc"
+            path = os.path.join(self.src, pattern)
+            files += glob.glob(path)
+        for file in files:
+            yield CompressDataset(file=file, dst=self.dst, log_file=True)
