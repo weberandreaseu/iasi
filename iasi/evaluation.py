@@ -155,14 +155,14 @@ class VariableErrorEstimation(FileTask):
         nol = original['atm_nol'][...]
         alt = original['atm_altitude'][...]
         avk = original['/state/WV/avk'][...]
-        alt_tropo = original['tropopause_altitude'][...]
+        alt_trop = original['tropopause_altitude'][...]
         counter = 0
         message = f'Calculate original error for {path}: {counter}/{len(tasks_and_input)}'
         logger.info(message)
         self.set_status_message(message)
         self.set_progress_percentage(int(counter / len(tasks_and_input) * 100))
         error_estimation: ErrorEstimation = ErrorEstimation.factory(
-            self.gas, nol, alt, avk, alt_tropo=alt_tropo)
+            self.gas, nol, alt, avk, alt_trop=alt_trop)
         # calculation of original error
         variable_report = error_estimation.report_for(
             original[path], original[path][...], None, rc_error=False)
@@ -197,24 +197,24 @@ class ErrorEstimation:
     levels_of_interest = []
 
     @staticmethod
-    def factory(gas: str, nol, alt, avk, alt_tropo=None):
+    def factory(gas: str, nol, alt, avk, alt_trop=None):
         if gas == 'WV':
-            return WaterVapour(gas, nol, alt, avk, alt_tropo, type_two=True)
+            return WaterVapour(gas, nol, alt, avk, alt_trop, type_two=True)
         if gas == 'GHG':
-            return GreenhouseGas(gas, nol, alt, alt_tropo)
+            return GreenhouseGas(gas, nol, alt, alt_trop)
         if gas == 'HNO3':
-            return NitridAcid(gas, nol, alt, alt_tropo)
+            return NitridAcid(gas, nol, alt, alt_trop)
         if gas == 'Tatm':
-            return AtmosphericTemperature(gas, nol, alt, alt_tropo)
+            return AtmosphericTemperature(gas, nol, alt, alt_trop)
         raise ValueError(f'No error estimation implementation for gas {gas}')
 
-    def __init__(self, gas, nol, alt, alt_tropo, type_two=False):
+    def __init__(self, gas, nol, alt, alt_trop, type_two=False):
         # each gas may have multiple levels of interest
         self.type_two = type_two
         self.nol = nol
         self.alt = alt
         self.gas = gas
-        self.alt_tropo = alt_tropo
+        self.alt_trop = alt_trop
 
     def report_for(self, variable: Variable, original, reconstructed, rc_error) -> pd.DataFrame:
         # if not original.shape == reconstructed.shape:
@@ -243,8 +243,7 @@ class ErrorEstimation:
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
             nol_event = self.nol.data[event]
-            covariance = Covariance(
-                nol_event, self.alt[event], alt_tropo=self.alt_tropo)
+            covariance = Covariance(nol_event, self.alt[event])
             original_event = reshaper.transform(original[event], nol_event)
             if original_event.mask.any():
                 logger.warn('Original array contains masked values')
@@ -268,8 +267,8 @@ class ErrorEstimation:
             # if gas does not require type 2 error estimation, break loop after first iteration
             calc_type_two = self.type_two
             while True:
-                error = estimation_method(
-                    original_event.data, rc_event, covariance, type2=calc_type_two, avk=avk_event)
+                error = estimation_method(event,
+                                          original_event.data, rc_event, covariance, type2=calc_type_two, avk=avk_event)
                 for loi in self.levels_of_interest:
                     # zero == surface (special value)
                     if loi == 0:
@@ -300,54 +299,60 @@ class ErrorEstimation:
                 calc_type_two = False
         return pd.DataFrame(result)
 
-    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
+    def averaging_kernel(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         raise NotImplementedError
 
-    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
+    def noise_matrix(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         raise NotImplementedError
 
-    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
+    def cross_averaging_kernel(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         raise NotImplementedError
+
+    def smoothing_error(self, actual_matrix, to_compare, assumed_covariance) -> np.ndarray:
+        """Calulate smooting error with two matrices and assumed covariance"""
+        return (actual_matrix - to_compare) @ assumed_covariance @ (actual_matrix - to_compare).T
 
 
 class WaterVapour(ErrorEstimation):
     levels_of_interest = [-6, -16, -19]
 
-    def __init__(self, gas, nol, alt, avk, alt_tropo, type_two=True):
-        super().__init__(gas, nol, alt, alt_tropo, type_two=type_two)
+    def __init__(self, gas, nol, alt, avk, alt_trop, type_two=True):
+        super().__init__(gas, nol, alt, alt_trop, type_two=type_two)
         self.avk = avk
 
     # for each method type one and type two
 
-    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
+    def averaging_kernel(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         # in this method, avk should be same like original
         if not np.allclose(original, avk):
             logger.warn('There are differences in original parameter and avk')
+        s_cov = self.assumed_covariance(event)
+        nol = self.nol.data[event]
         if type2:
             # type 2 error
             original_type2 = covariance.type2_of(original)
             if reconstructed is None:
                 # type 2 original error
-                return covariance.smoothing_error(original_type2, np.identity(2 * covariance.nol))
+                return self.smoothing_error(original_type2, np.identity(2 * nol), s_cov)
             else:
                 # type 2 reconstruction error
                 rc_type2 = covariance.type2_of(reconstructed)
-                return covariance.smoothing_error(original_type2, rc_type2)
+                return self.smoothing_error(original_type2, rc_type2, s_cov)
         else:
             # type 1 error
             original_type1 = covariance.type1_of(original)
             if reconstructed is None:
                 # type 1 original error
-                return covariance.smoothing_error(
-                    original_type1, np.identity(2 * covariance.nol))
+                return self.smoothing_error(
+                    original_type1, np.identity(2 * nol), s_cov)
             else:
                 # type 1 reconstruction error
                 rc_type1 = covariance.type1_of(reconstructed)
                 # _calc_Sa_(covariance.nol, covariance.alt,
                 #           covariance.alt[0], None, alt_strat=25000)
-                return covariance.smoothing_error(original_type1, rc_type1)
+                return self.smoothing_error(original_type1, rc_type1, s_cov)
 
-    def noise_matrix(self, original: np.ndarray, reconstruced: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
+    def noise_matrix(self, event: int, original: np.ndarray, reconstruced: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         # original/approx event is already covariance matrix -> only type1/2 transformation
         assert avk is not None
         P = covariance.traf()
@@ -371,10 +376,10 @@ class WaterVapour(ErrorEstimation):
                 rc_type1 = P @ reconstruced @ P.T
                 return np.absolute(original_type1 - rc_type1)
 
-    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
+    def cross_averaging_kernel(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         assert avk is not None
         P = covariance.traf()
-        s_cov = covariance.assumed_covariance(species=1)
+        s_cov = self.assumed_covariance_temp(event)
         if type2:
             # type 2 error
             C = covariance.c_by_avk(avk)
@@ -384,7 +389,7 @@ class WaterVapour(ErrorEstimation):
                 return original_type2 @ s_cov @ original_type2.T
             # reconstruction error
             rc_type2 = C @ P @ reconstructed
-            return covariance.smoothing_error(original_type2, rc_type2, species=1)
+            return self.smoothing_error(original_type2, rc_type2, s_cov)
         else:
             # type 1 error
             original_type1 = P @ original
@@ -394,20 +399,138 @@ class WaterVapour(ErrorEstimation):
             else:
                 # reconstruction error
                 rc_type1 = P @ reconstructed
-                return covariance.smoothing_error(original_type1, rc_type1, species=1)
+                return self.smoothing_error(original_type1, rc_type1, s_cov)
+
+    def assumed_covariance(self, event: int, alt_strat=25000, f_sigma=1.) -> np.ndarray:
+        """Return assumed covariance for both H2O and HDO"""
+        nol = self.nol.data[event]
+        alt = self.alt.data[event, :nol]
+        amp_H2O = np.zeros(nol)  # , dtype='float64')
+        amp_dD = np.zeros(nol)  # , dtype='float64')
+        sigma = np.zeros(nol)  # , dtype='float64')
+        fct_partial = partial(self._get_s_par_wv,
+                              alt0=alt[0],
+                              alt_trop=self.alt_trop.data[event],
+                              alt_strat=alt_strat,
+                              f_sigma=f_sigma)
+        results = map(fct_partial, alt)
+
+        for ires, res in enumerate(results):
+            amp_H2O[ires] = res[0]
+            amp_dD[ires] = res[1]
+            sigma[ires] = res[2]
+
+        S_H2O = amp_H2O[:, np.newaxis] * amp_H2O[np.newaxis, :] \
+            * np.exp(-(alt[:, np.newaxis] - alt[np.newaxis, :])**2 / (2 * sigma[:, np.newaxis] * sigma[np.newaxis, :]))
+        S_dD = amp_dD[:, np.newaxis] * amp_dD[np.newaxis, :] \
+            * np.exp(-(alt[:, np.newaxis] - alt[np.newaxis, :])**2 / (2 * sigma[:, np.newaxis] * sigma[np.newaxis, :]))
+
+        S_H2O = np.asarray(S_H2O)  # , dtype='float32')
+        S_dD = np.asarray(S_dD)  # ,  dtype='float32')
+
+        Sa_ = np.zeros([2*nol, 2*nol])  # , dtype='float32')
+        Sa_[:nol, :nol] = S_H2O
+        Sa_[nol:, nol:] = S_dD
+        return Sa_
+
+    def assumed_covariance_temp(self, event: int) -> np.ndarray:
+        """Return assumed covariance for temperature cross averaging kernel"""
+        nol = self.nol.data[event]
+        amp_T = np.zeros(nol)
+        sigma_T = np.zeros(nol)
+        alt = self.alt.data[event, :nol]
+
+        fct_partial = partial(self._get_s_par_t,
+                              alt0=alt[0],
+                              alt_trop=self.alt_trop.data[event])
+        results = map(fct_partial, alt)
+
+        for ires, res in enumerate(results):
+            amp_T[ires] = res[0]
+            sigma_T[ires] = res[1]
+
+        SaT = amp_T[:, np.newaxis] * amp_T[np.newaxis, :] \
+            * np.exp(-(alt[:, np.newaxis] - alt[np.newaxis])**2 / (2 * sigma_T[:, np.newaxis] * sigma_T[np.newaxis, :]))
+        SaT = np.asarray(SaT.T)  # , dtype='float32')
+        return SaT
+
+    def _get_s_par_wv(self, alt: float, alt0: float, alt_trop: float, alt_strat=25000, f_sigma=1.):
+        if alt < 5000.:
+            amp_H2O = 0.75 * (1 + alt / 5000)
+            amp_dD = 0.09 * (1 + alt / 5000)
+            sigma = f_sigma * 1500. * (1. + (alt - alt0) / (alt_trop - alt0))
+        elif alt >= 5000. and alt < alt_trop:
+            amp_H2O = 1.5
+            amp_dD = 0.18
+            sigma = f_sigma * 1500. * (1. + (alt - alt0) / (alt_trop - alt0))
+        elif alt >= alt_trop and alt < alt_strat:
+            amp_H2O = 1.5 - 1.2 * (alt - alt_trop) / (alt_strat - alt_trop)
+            amp_dD = 0.18 - 0.12 * (alt - alt_trop) / (alt_strat - alt_trop)
+            sigma = f_sigma * 3000. * \
+                (1. + (alt - alt_trop) / (alt_strat - alt_trop))
+        elif alt >= alt_strat:
+            amp_H2O = 0.3
+            amp_dD = 0.06
+            sigma = f_sigma * 6000.
+        else:
+            raise ValueError('Invalid altitude')
+
+        return amp_H2O, amp_dD, sigma
+
+    def _get_s_par_t(self, alt, alt0, alt_trop):
+        if alt0+4000 < alt_trop:
+            # setting amp_T
+            if alt <= alt0+4000:
+                amp_T = 2.0 - 1.0 * (alt - alt0) / 4000
+            elif alt >= alt0+4000 and alt <= alt_trop:
+                amp_T = 1.
+            elif alt > alt_trop and alt <= alt_trop+5000:
+                amp_T = 1.0 + 0.5 * (alt - alt_trop) / 5000
+            elif alt > alt_trop+5000:
+                amp_T = 1.5
+
+            # setting sigmaT
+            if alt < alt_trop:
+                sigmaT = 2500 * (1 + (alt - alt0) / (alt_trop - alt0))
+            elif alt >= alt_trop and alt < alt_trop+10000:
+                sigmaT = 5000 * (1 + (alt - alt_trop) / 10000)
+            elif alt >= alt_trop+10000:
+                sigmaT = 10000
+        else:
+            # setting amp_T
+            if alt < alt_trop:
+                amp_T = 2.0 - 1.0 * (alt - alt0) / (alt_trop - alt0)
+            elif alt == alt_trop:
+                amp_T = 1.
+            elif alt > alt_trop and alt <= alt_trop+5000:
+                amp_T = 1.0 + 0.5 * (alt - alt_trop) / 5000
+            elif alt > alt_trop+5000:
+                amp_T = 1.5
+
+            # setting sigmaT
+            if alt < alt_trop:
+                sigmaT = 2500 * (1 + (alt - alt0) / (alt_trop - alt0))
+            elif alt >= alt_trop and alt < alt_trop+10000:
+                sigmaT = 5000 * (1 + (alt - alt_trop) / 10000)
+            elif alt >= alt_trop+10000:
+                sigmaT = 10000
+
+        sigmaT = sigmaT * 3/5  # 0.2
+
+        return amp_T, sigmaT
 
 
 class GreenhouseGas(ErrorEstimation):
     levels_of_interest = [-6, -10, -19]
 
-    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
+    def averaging_kernel(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         assert not type2
         if reconstructed is None:
             # original error
             reconstructed = np.identity(covariance.nol * 2)
         return covariance.smoothing_error(original, reconstructed, species=2, w2=1)
 
-    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
+    def cross_averaging_kernel(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         assert not type2
         if reconstructed is None:
             # original error
@@ -415,7 +538,7 @@ class GreenhouseGas(ErrorEstimation):
             return original @ s_cov @ original.T
         return covariance.smoothing_error(original, reconstructed, species=1)
 
-    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
+    def noise_matrix(self,  event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         if reconstructed is None:
             return original
         else:
@@ -425,21 +548,21 @@ class GreenhouseGas(ErrorEstimation):
 class NitridAcid(ErrorEstimation):
     levels_of_interest = [-6]
 
-    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
+    def averaging_kernel(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         assert not type2
         if reconstructed is None:
             # original error
             reconstructed = np.identity(covariance.nol)
         return covariance.smoothing_error(original, reconstructed, species=1)
 
-    def cross_averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
+    def cross_averaging_kernel(self,  event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         if reconstructed is None:
             # original error
             s_cov = covariance.assumed_covariance(species=1)
             return original @ s_cov @ original.T
         return covariance.smoothing_error(original, reconstructed, species=1)
 
-    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
+    def noise_matrix(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         if reconstructed is None:
             return original
         else:
@@ -450,13 +573,13 @@ class AtmosphericTemperature(ErrorEstimation):
     # zero means surface
     levels_of_interest = [0, -10, -19]
 
-    def averaging_kernel(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
+    def averaging_kernel(self,  event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         assert not type2
         if reconstructed is None:
             reconstructed = np.identity(covariance.nol)
         return covariance.smoothing_error(original, reconstructed, species=1)
 
-    def noise_matrix(self, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
+    def noise_matrix(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         assert not type2
         if reconstructed is None:
             return original
