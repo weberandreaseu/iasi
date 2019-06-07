@@ -613,12 +613,12 @@ class GreenhouseGas(ErrorEstimation):
         amp = np.ndarray((nol))
         for i in range(nol):
             if alt[i] < alt_trop:
-                amp[i] = 100
+                amp[i] = 0.1
             if alt[i] >= alt_trop:
-                amp[i] = 100 + (alt[i] - alt_trop) * \
-                    ((250 - 100)/(alt_strat - alt_trop))
+                amp[i] = 0.1 + (alt[i] - alt_trop) * \
+                    ((0.25 - 0.1)/(alt_strat - alt_trop))
             if alt[i] >= alt_strat:
-                amp[i] = 250
+                amp[i] = 0.25
         return amp
 
 
@@ -662,26 +662,26 @@ class NitridAcid(ErrorEstimation):
             if alt[0] < alt_trop - 4000:
                 # higher variances in valley's due to human made emmisions
                 if alt[i] < alt_trop - 4000:
-                    amp[i] = 2400 + (alt[i] - alt[0]) * \
-                        ((1200 - 2400)/(alt_trop - 4000 - alt[0]))
+                    amp[i] = 2.4 + (alt[i] - alt[0]) * \
+                        ((1.2 - 2.4)/(alt_trop - 4000 - alt[0]))
                 elif alt_trop - 4000 <= alt[i] < alt_trop + 8000:
-                    amp[i] = 1200
+                    amp[i] = 1.2
                 elif alt_trop + 8000 <= alt[i] < 50000:
-                    amp[i] = 1200 + (alt[i] - (alt_trop + 8000)) * \
-                        ((300-1200) / (50000 - (alt_trop + 8000)))
+                    amp[i] = 1.2 + (alt[i] - (alt_trop + 8000)) * \
+                        ((0.3-1.2) / (50000 - (alt_trop + 8000)))
                 elif alt[i] >= 50000:
-                    amp[i] = 300
+                    amp[i] = 0.3
                 else:
                     raise ValueError('Invalid altitude')
             else:
                 # at higher altitudes covariance is lower
                 if alt_trop - 4000 <= alt[i] < alt_trop + 8000:
-                    amp[i] = 1200
+                    amp[i] = 1.2
                 elif alt_trop + 8000 < alt[i] < 50000:
-                    amp[i] = 1200 + (alt[i] - (alt_trop + 8000)) * \
-                        ((300 - 1200)/(50000 - (alt_trop + 8000)))
+                    amp[i] = 1.2 + (alt[i] - (alt_trop + 8000)) * \
+                        ((0.3 - 1.2)/(50000 - (alt_trop + 8000)))
                 elif alt[i] >= 50000:
-                    amp[i] = 300
+                    amp[i] = 0.3
                 else:
                     raise ValueError('Invalid altitude')
         return amp
