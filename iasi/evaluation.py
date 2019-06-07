@@ -579,7 +579,7 @@ class GreenhouseGas(ErrorEstimation):
     def assumed_covariance(self, event, alt_strat=25000) -> np.ndarray:
         amp = self._amplitude(event, alt_strat)
         sig = self.sig(event, alt_strat=alt_strat)
-        s_cov = self.construct_covariance(event, amp, sig)
+        s_cov = self.construct_covariance(event, amp, sig * 0.6)
         nol = self.nol.data[event]
         result = np.zeros((2 * nol, 2 * nol))
         result[:nol, :nol] = s_cov
@@ -587,8 +587,8 @@ class GreenhouseGas(ErrorEstimation):
         return result
 
     def _amplitude(self, event, alt_strat):
-        alt = self.alt.data[event]
         nol = self.nol.data[event]
+        alt = self.alt.data[event, :nol]
         alt_trop = self.alt_trop.data[event]
         result = np.ndarray((nol))
         for i in range(nol):
@@ -610,20 +610,60 @@ class NitridAcid(ErrorEstimation):
         if reconstructed is None:
             # original error
             reconstructed = np.identity(covariance.nol)
-        return covariance.smoothing_error(original, reconstructed, species=1)
+        s_cov = self.assumed_covariance(event)
+        return self.smoothing_error(original, reconstructed, s_cov)
 
     def cross_averaging_kernel(self,  event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
+        s_cov = self.assumed_covariance_temperature(event)
         if reconstructed is None:
             # original error
-            s_cov = covariance.assumed_covariance(species=1)
             return original @ s_cov @ original.T
-        return covariance.smoothing_error(original, reconstructed, species=1)
+        return self.smoothing_error(original, reconstructed, s_cov)
 
     def noise_matrix(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         if reconstructed is None:
             return original
         else:
             return np.absolute(original - reconstructed)
+
+    def assumed_covariance(self, event, alt_strat=25000) -> np.ndarray:
+        amp = self._amplitude(event, alt_strat=alt_strat)
+        sig = self.sig(event, alt_strat=alt_strat)
+        return self.construct_covariance(event, amp, sig * 1.2)
+
+    def _amplitude(self, event: int, alt_strat=25000):
+        nol = self.nol.data[event]
+        alt = self.alt.data[event, :nol]
+        alt_trop = self.alt_trop.data[event]
+        result = np.ndarray((nol))
+        for i in range(nol):
+            # surface is more than 4km below tropopause
+            if alt[0] < alt_trop - 4000:
+                # higher variances in valley's due to human made emmisions
+                if alt[i] < alt_trop - 4000:
+                    result[i] = 2400 + (alt[i] - alt[0]) * \
+                        ((1200 - 2400)/(alt_trop - 4000 - alt[0]))
+                elif alt_trop - 4000 <= alt[i] < alt_trop + 8000:
+                    result[i] = 1200
+                elif alt_trop + 8000 <= alt[i] < 50000:
+                    result[i] = 1200 + (alt[i] - (alt_trop + 8000)) * \
+                        ((300-1200) / (50000 - (alt_trop + 8000)))
+                elif alt[i] >= 50000:
+                    result[i] = 300
+                else:
+                    raise ValueError('Invalid altitude')
+            else:
+                # at higher altitudes covariance is lower
+                if alt_trop - 4000 <= alt[i] < alt_trop + 8000:
+                    result[i] = 1200
+                elif alt_trop + 8000 < alt[i] < 50000:
+                    result[i] = 1200 + (alt[i] - (alt_trop + 8000)) * \
+                        ((300 - 1200)/(50000 - (alt_trop + 8000)))
+                elif alt[i] >= 50000:
+                    result[i] = 300
+                else:
+                    raise ValueError('Invalid altitude')
+        return result
 
 
 class AtmosphericTemperature(ErrorEstimation):
