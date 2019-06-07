@@ -54,25 +54,30 @@ for i in range(nol):
 
     # surface is more than 4km below tropopause
     if alt[0] < alt_trop - 4000:
-        # TODO: template is strage here. ask for feedback
+        # higher variances in valley's due to human made emmisions
         if alt[i] < alt_trop - 4000:
             a_HNO3[i] = 2400 + (alt[i] - alt[0]) * \
                 ((1200 - 2400)/(alt_trop - 4000 - alt[0]))
-        if alt_trop - 4000 <= alt[i] < alt_trop + 8000:
+        elif alt_trop - 4000 <= alt[i] < alt_trop + 8000:
             a_HNO3[i] = 1200
-        if alt_trop + 8000 <= alt[i] < 50000:
+        elif alt_trop + 8000 <= alt[i] < 50000:
             a_HNO3[i] = 1200 + (alt[i] - (alt_trop + 8000)) * \
                 ((300-1200) / (50000 - (alt_trop + 8000)))
-        if alt[i] >= 50000:
+        elif alt[i] >= 50000:
             a_HNO3[i] = 300
+        else:
+            raise ValueError('Invalid altitude')
     else:
-        if alt_trop - 4000 < alt[i] < alt_trop + 8000:
+        # at higher altitudes covariance is lower
+        if alt_trop - 4000 <= alt[i] < alt_trop + 8000:
             a_HNO3[i] = 1200
-        if alt_trop + 8000 < alt[i] < 50000:
+        elif alt_trop + 8000 < alt[i] < 50000:
             a_HNO3[i] = 1200 + (alt[i] - (alt_trop + 8000)) * \
                 ((300 - 1200)/(50000 - (alt_trop + 8000)))
-        if alt[i] >= 50000:
+        elif alt[i] >= 50000:
             a_HNO3[i] = 300
+        else:
+            raise ValueError('Invalid altitude')
 
 sa_HNO3 = assumed_covariance(a_HNO3, sig * 1.2)
 sa_CH4 = assumed_covariance(a_CH4, sig * 0.6)
