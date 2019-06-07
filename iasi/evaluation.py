@@ -319,7 +319,7 @@ class ErrorEstimation:
         sigma_T = np.zeros(nol)
         alt = self.alt.data[event, :nol]
 
-        fct_partial = partial(self._get_s_par_t,
+        fct_partial = partial(self._get_amp_and_sig_temp,
                               alt0=alt[0],
                               alt_trop=self.alt_trop.data[event])
         results = map(fct_partial, alt)
@@ -333,38 +333,53 @@ class ErrorEstimation:
         SaT = np.asarray(SaT.T)  # , dtype='float32')
         return SaT
 
-    def construct_covariance(self, event, a: np.ndarray, sig: np.ndarray):
-        """create a covariance matrix by variance and deviation"""
+    def construct_covariance_matrix(self, event, amp: np.ndarray, sig: np.ndarray) -> np.ndarray:
+        """create a covariance matrix by amplitude and deviation
+
+        :param amp: Amplitude for levels
+        :param sig: Standard deviation for levels
+        """
         nol = self.nol.data[event]
         alt = self.alt.data[event]
         sa = np.ndarray((nol, nol))
         for i in range(nol):
             for j in range(nol):
-                sa[i, j] = a[i] * a[j] * \
+                sa[i, j] = amp[i] * amp[j] * \
                     np.exp(-((alt[i] - alt[j])*(alt[i] - alt[j])) /
                            (2 * sig[i] * sig[j]))
         return sa
 
-    def sig(self, event, alt_strat=25000):
+    def sigma(self, event, alt_strat=25000, f_sigma: float = 1) -> np.ndarray:
+        """Standard deviation for levels in meters. Used by GHG and HNO3.
+
+        :param alt_strat:   altitude of stratosphere in meters
+        :param f_sigma:     scaling factor
+
+        :return: array of dst for each level
+        """
         nol = self.nol.data[event]
         alt = self.alt.data[event]
         alt_trop = self.alt_trop[event]
-        result = np.ndarray(nol)
+        sig = np.ndarray(nol)
         for i in range(nol):
             # below tropopause
             if alt[i] < alt_trop:
-                result[i] = 2500 + (alt[i] - alt[0]) * \
+                sig[i] = 2500 + (alt[i] - alt[0]) * \
                     ((5000-2500)/(alt_trop-alt[0]))
             # inside statrophere
             if alt[i] >= alt_trop and alt[i] < alt_strat:
-                result[i] = 5000+(alt[i]-alt_trop) * \
+                sig[i] = 5000+(alt[i]-alt_trop) * \
                     ((10000-5000)/(alt_strat-alt_trop))
             # above stratosphere
             if alt[i] > alt_strat:
-                result[i] = 10000
-        return result
+                sig[i] = 10000
+        return sig
 
-    def _get_s_par_t(self, alt, alt0, alt_trop):
+    def _get_amp_and_sig_temp(self, alt, alt0, alt_trop):
+        """Get amplitude and deviation for atmospheric temperature
+        
+        :return: (amp, sig)
+        """
         if alt0+4000 < alt_trop:
             # setting amp_T
             if alt <= alt0+4000:
@@ -496,13 +511,13 @@ class WaterVapour(ErrorEstimation):
                 return self.smoothing_error(original_type1, rc_type1, s_cov)
 
     def assumed_covariance(self, event: int, alt_strat=25000, f_sigma=1.) -> np.ndarray:
-        """Return assumed covariance for both H2O and HDO"""
+        """Assumed covariance for both H2O and HDO"""
         nol = self.nol.data[event]
         alt = self.alt.data[event, :nol]
         amp_H2O = np.zeros(nol)  # , dtype='float64')
         amp_dD = np.zeros(nol)  # , dtype='float64')
         sigma = np.zeros(nol)  # , dtype='float64')
-        fct_partial = partial(self._get_s_par_wv,
+        fct_partial = partial(self._get_amp_and_sig,
                               alt0=alt[0],
                               alt_trop=self.alt_trop.data[event],
                               alt_strat=alt_strat,
@@ -527,7 +542,11 @@ class WaterVapour(ErrorEstimation):
         Sa_[nol:, nol:] = S_dD
         return Sa_
 
-    def _get_s_par_wv(self, alt: float, alt0: float, alt_trop: float, alt_strat=25000, f_sigma=1.):
+    def _get_amp_and_sig(self, alt: float, alt0: float, alt_trop: float, alt_strat=25000, f_sigma=1.):
+        """Calculate amplitud for H2O and HDO as well as std
+
+        :return: (amp_H2O, amp_dD, sigma)
+        """
         if alt < 5000.:
             amp_H2O = 0.75 * (1 + alt / 5000)
             amp_dD = 0.09 * (1 + alt / 5000)
@@ -578,28 +597,29 @@ class GreenhouseGas(ErrorEstimation):
 
     def assumed_covariance(self, event, alt_strat=25000) -> np.ndarray:
         amp = self._amplitude(event, alt_strat)
-        sig = self.sig(event, alt_strat=alt_strat)
-        s_cov = self.construct_covariance(event, amp, sig * 0.6)
+        sig = self.sigma(event, alt_strat=alt_strat, f_sigma=0.6)
+        s_cov = self.construct_covariance_matrix(event, amp, sig)
         nol = self.nol.data[event]
-        result = np.zeros((2 * nol, 2 * nol))
-        result[:nol, :nol] = s_cov
-        result[nol:, nol:] = s_cov
-        return result
+        s_cov_ghg = np.zeros((2 * nol, 2 * nol))
+        s_cov_ghg[:nol, :nol] = s_cov
+        s_cov_ghg[nol:, nol:] = s_cov
+        return s_cov_ghg
 
-    def _amplitude(self, event, alt_strat):
+    def _amplitude(self, event, alt_strat) -> np.ndarray:
+        """Amplitude for GHG"""
         nol = self.nol.data[event]
         alt = self.alt.data[event, :nol]
         alt_trop = self.alt_trop.data[event]
-        result = np.ndarray((nol))
+        amp = np.ndarray((nol))
         for i in range(nol):
             if alt[i] < alt_trop:
-                result[i] = 100
+                amp[i] = 100
             if alt[i] >= alt_trop:
-                result[i] = 100 + (alt[i] - alt_trop) * \
+                amp[i] = 100 + (alt[i] - alt_trop) * \
                     ((250 - 100)/(alt_strat - alt_trop))
             if alt[i] >= alt_strat:
-                result[i] = 250
-        return result
+                amp[i] = 250
+        return amp
 
 
 class NitridAcid(ErrorEstimation):
@@ -628,42 +648,43 @@ class NitridAcid(ErrorEstimation):
 
     def assumed_covariance(self, event, alt_strat=25000) -> np.ndarray:
         amp = self._amplitude(event, alt_strat=alt_strat)
-        sig = self.sig(event, alt_strat=alt_strat)
-        return self.construct_covariance(event, amp, sig * 1.2)
+        sig = self.sigma(event, alt_strat=alt_strat, f_sigma=1.2)
+        return self.construct_covariance_matrix(event, amp, sig)
 
     def _amplitude(self, event: int, alt_strat=25000):
+        """Amplitude of HNO3"""
         nol = self.nol.data[event]
         alt = self.alt.data[event, :nol]
         alt_trop = self.alt_trop.data[event]
-        result = np.ndarray((nol))
+        amp = np.ndarray((nol))
         for i in range(nol):
             # surface is more than 4km below tropopause
             if alt[0] < alt_trop - 4000:
                 # higher variances in valley's due to human made emmisions
                 if alt[i] < alt_trop - 4000:
-                    result[i] = 2400 + (alt[i] - alt[0]) * \
+                    amp[i] = 2400 + (alt[i] - alt[0]) * \
                         ((1200 - 2400)/(alt_trop - 4000 - alt[0]))
                 elif alt_trop - 4000 <= alt[i] < alt_trop + 8000:
-                    result[i] = 1200
+                    amp[i] = 1200
                 elif alt_trop + 8000 <= alt[i] < 50000:
-                    result[i] = 1200 + (alt[i] - (alt_trop + 8000)) * \
+                    amp[i] = 1200 + (alt[i] - (alt_trop + 8000)) * \
                         ((300-1200) / (50000 - (alt_trop + 8000)))
                 elif alt[i] >= 50000:
-                    result[i] = 300
+                    amp[i] = 300
                 else:
                     raise ValueError('Invalid altitude')
             else:
                 # at higher altitudes covariance is lower
                 if alt_trop - 4000 <= alt[i] < alt_trop + 8000:
-                    result[i] = 1200
+                    amp[i] = 1200
                 elif alt_trop + 8000 < alt[i] < 50000:
-                    result[i] = 1200 + (alt[i] - (alt_trop + 8000)) * \
+                    amp[i] = 1200 + (alt[i] - (alt_trop + 8000)) * \
                         ((300 - 1200)/(50000 - (alt_trop + 8000)))
                 elif alt[i] >= 50000:
-                    result[i] = 300
+                    amp[i] = 300
                 else:
                     raise ValueError('Invalid altitude')
-        return result
+        return amp
 
 
 class AtmosphericTemperature(ErrorEstimation):
