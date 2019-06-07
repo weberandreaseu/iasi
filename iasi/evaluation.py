@@ -670,11 +670,12 @@ class AtmosphericTemperature(ErrorEstimation):
     # zero means surface
     levels_of_interest = [0, -10, -19]
 
-    def averaging_kernel(self,  event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
+    def averaging_kernel(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         assert not type2
         if reconstructed is None:
             reconstructed = np.identity(covariance.nol)
-        return covariance.smoothing_error(original, reconstructed, species=1)
+        s_cov = self.assumed_covariance_temperature(event)
+        return self.smoothing_error(original, reconstructed, s_cov)
 
     def noise_matrix(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None):
         assert not type2
