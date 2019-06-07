@@ -312,6 +312,100 @@ class ErrorEstimation:
         """Calulate smooting error with two matrices and assumed covariance"""
         return (actual_matrix - to_compare) @ assumed_covariance @ (actual_matrix - to_compare).T
 
+    def assumed_covariance_temperature(self, event: int) -> np.ndarray:
+        """Return assumed covariance for temperature cross averaging kernel"""
+        nol = self.nol.data[event]
+        amp_T = np.zeros(nol)
+        sigma_T = np.zeros(nol)
+        alt = self.alt.data[event, :nol]
+
+        fct_partial = partial(self._get_s_par_t,
+                              alt0=alt[0],
+                              alt_trop=self.alt_trop.data[event])
+        results = map(fct_partial, alt)
+
+        for ires, res in enumerate(results):
+            amp_T[ires] = res[0]
+            sigma_T[ires] = res[1]
+
+        SaT = amp_T[:, np.newaxis] * amp_T[np.newaxis, :] \
+            * np.exp(-(alt[:, np.newaxis] - alt[np.newaxis])**2 / (2 * sigma_T[:, np.newaxis] * sigma_T[np.newaxis, :]))
+        SaT = np.asarray(SaT.T)  # , dtype='float32')
+        return SaT
+
+    def construct_covariance(self, event, a: np.ndarray, sig: np.ndarray):
+        """create a covariance matrix by variance and deviation"""
+        nol = self.nol.data[event]
+        alt = self.alt.data[event]
+        sa = np.ndarray((nol, nol))
+        for i in range(nol):
+            for j in range(nol):
+                sa[i, j] = a[i] * a[j] * \
+                    np.exp(-((alt[i] - alt[j])*(alt[i] - alt[j])) /
+                           (2 * sig[i] * sig[j]))
+        return sa
+
+    def sig(self, event, alt_strat=25000):
+        nol = self.nol.data[event]
+        alt = self.alt.data[event]
+        alt_trop = self.alt_trop[event]
+        result = np.ndarray(nol)
+        for i in range(nol):
+            # below tropopause
+            if alt[i] < alt_trop:
+                result[i] = 2500 + (alt[i] - alt[0]) * \
+                    ((5000-2500)/(alt_trop-alt[0]))
+            # inside statrophere
+            if alt[i] >= alt_trop and alt[i] < alt_strat:
+                result[i] = 5000+(alt[i]-alt_trop) * \
+                    ((10000-5000)/(alt_strat-alt_trop))
+            # above stratosphere
+            if alt[i] > alt_strat:
+                result[i] = 10000
+        return result
+
+    def _get_s_par_t(self, alt, alt0, alt_trop):
+        if alt0+4000 < alt_trop:
+            # setting amp_T
+            if alt <= alt0+4000:
+                amp_T = 2.0 - 1.0 * (alt - alt0) / 4000
+            elif alt >= alt0+4000 and alt <= alt_trop:
+                amp_T = 1.
+            elif alt > alt_trop and alt <= alt_trop+5000:
+                amp_T = 1.0 + 0.5 * (alt - alt_trop) / 5000
+            elif alt > alt_trop+5000:
+                amp_T = 1.5
+
+            # setting sigmaT
+            if alt < alt_trop:
+                sigmaT = 2500 * (1 + (alt - alt0) / (alt_trop - alt0))
+            elif alt >= alt_trop and alt < alt_trop+10000:
+                sigmaT = 5000 * (1 + (alt - alt_trop) / 10000)
+            elif alt >= alt_trop+10000:
+                sigmaT = 10000
+        else:
+            # setting amp_T
+            if alt < alt_trop:
+                amp_T = 2.0 - 1.0 * (alt - alt0) / (alt_trop - alt0)
+            elif alt == alt_trop:
+                amp_T = 1.
+            elif alt > alt_trop and alt <= alt_trop+5000:
+                amp_T = 1.0 + 0.5 * (alt - alt_trop) / 5000
+            elif alt > alt_trop+5000:
+                amp_T = 1.5
+
+            # setting sigmaT
+            if alt < alt_trop:
+                sigmaT = 2500 * (1 + (alt - alt0) / (alt_trop - alt0))
+            elif alt >= alt_trop and alt < alt_trop+10000:
+                sigmaT = 5000 * (1 + (alt - alt_trop) / 10000)
+            elif alt >= alt_trop+10000:
+                sigmaT = 10000
+
+        sigmaT = sigmaT * 3/5  # 0.2
+
+        return amp_T, sigmaT
+
 
 class WaterVapour(ErrorEstimation):
     levels_of_interest = [-6, -16, -19]
@@ -379,7 +473,7 @@ class WaterVapour(ErrorEstimation):
     def cross_averaging_kernel(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         assert avk is not None
         P = covariance.traf()
-        s_cov = self.assumed_covariance_temp(event)
+        s_cov = self.assumed_covariance_temperature(event)
         if type2:
             # type 2 error
             C = covariance.c_by_avk(avk)
@@ -433,27 +527,6 @@ class WaterVapour(ErrorEstimation):
         Sa_[nol:, nol:] = S_dD
         return Sa_
 
-    def assumed_covariance_temp(self, event: int) -> np.ndarray:
-        """Return assumed covariance for temperature cross averaging kernel"""
-        nol = self.nol.data[event]
-        amp_T = np.zeros(nol)
-        sigma_T = np.zeros(nol)
-        alt = self.alt.data[event, :nol]
-
-        fct_partial = partial(self._get_s_par_t,
-                              alt0=alt[0],
-                              alt_trop=self.alt_trop.data[event])
-        results = map(fct_partial, alt)
-
-        for ires, res in enumerate(results):
-            amp_T[ires] = res[0]
-            sigma_T[ires] = res[1]
-
-        SaT = amp_T[:, np.newaxis] * amp_T[np.newaxis, :] \
-            * np.exp(-(alt[:, np.newaxis] - alt[np.newaxis])**2 / (2 * sigma_T[:, np.newaxis] * sigma_T[np.newaxis, :]))
-        SaT = np.asarray(SaT.T)  # , dtype='float32')
-        return SaT
-
     def _get_s_par_wv(self, alt: float, alt0: float, alt_trop: float, alt_strat=25000, f_sigma=1.):
         if alt < 5000.:
             amp_H2O = 0.75 * (1 + alt / 5000)
@@ -477,48 +550,6 @@ class WaterVapour(ErrorEstimation):
 
         return amp_H2O, amp_dD, sigma
 
-    def _get_s_par_t(self, alt, alt0, alt_trop):
-        if alt0+4000 < alt_trop:
-            # setting amp_T
-            if alt <= alt0+4000:
-                amp_T = 2.0 - 1.0 * (alt - alt0) / 4000
-            elif alt >= alt0+4000 and alt <= alt_trop:
-                amp_T = 1.
-            elif alt > alt_trop and alt <= alt_trop+5000:
-                amp_T = 1.0 + 0.5 * (alt - alt_trop) / 5000
-            elif alt > alt_trop+5000:
-                amp_T = 1.5
-
-            # setting sigmaT
-            if alt < alt_trop:
-                sigmaT = 2500 * (1 + (alt - alt0) / (alt_trop - alt0))
-            elif alt >= alt_trop and alt < alt_trop+10000:
-                sigmaT = 5000 * (1 + (alt - alt_trop) / 10000)
-            elif alt >= alt_trop+10000:
-                sigmaT = 10000
-        else:
-            # setting amp_T
-            if alt < alt_trop:
-                amp_T = 2.0 - 1.0 * (alt - alt0) / (alt_trop - alt0)
-            elif alt == alt_trop:
-                amp_T = 1.
-            elif alt > alt_trop and alt <= alt_trop+5000:
-                amp_T = 1.0 + 0.5 * (alt - alt_trop) / 5000
-            elif alt > alt_trop+5000:
-                amp_T = 1.5
-
-            # setting sigmaT
-            if alt < alt_trop:
-                sigmaT = 2500 * (1 + (alt - alt0) / (alt_trop - alt0))
-            elif alt >= alt_trop and alt < alt_trop+10000:
-                sigmaT = 5000 * (1 + (alt - alt_trop) / 10000)
-            elif alt >= alt_trop+10000:
-                sigmaT = 10000
-
-        sigmaT = sigmaT * 3/5  # 0.2
-
-        return amp_T, sigmaT
-
 
 class GreenhouseGas(ErrorEstimation):
     levels_of_interest = [-6, -10, -19]
@@ -528,21 +559,47 @@ class GreenhouseGas(ErrorEstimation):
         if reconstructed is None:
             # original error
             reconstructed = np.identity(covariance.nol * 2)
-        return covariance.smoothing_error(original, reconstructed, species=2, w2=1)
+        s_cov = self.assumed_covariance(event)
+        return self.smoothing_error(original, reconstructed, s_cov)
 
     def cross_averaging_kernel(self, event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         assert not type2
+        s_cov = self.assumed_covariance_temperature(event)
         if reconstructed is None:
             # original error
-            s_cov = covariance.assumed_covariance(species=1)
             return original @ s_cov @ original.T
-        return covariance.smoothing_error(original, reconstructed, species=1)
+        return self.smoothing_error(original, reconstructed, s_cov)
 
     def noise_matrix(self,  event: int, original: np.ndarray, reconstructed: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
         if reconstructed is None:
             return original
         else:
             return np.absolute(original - reconstructed)
+
+    def assumed_covariance(self, event, alt_strat=25000) -> np.ndarray:
+        amp = self._amplitude(event, alt_strat)
+        sig = self.sig(event, alt_strat=alt_strat)
+        s_cov = self.construct_covariance(event, amp, sig)
+        nol = self.nol.data[event]
+        result = np.zeros((2 * nol, 2 * nol))
+        result[:nol, :nol] = s_cov
+        result[nol:, nol:] = s_cov
+        return result
+
+    def _amplitude(self, event, alt_strat):
+        alt = self.alt.data[event]
+        nol = self.nol.data[event]
+        alt_trop = self.alt_trop.data[event]
+        result = np.ndarray((nol))
+        for i in range(nol):
+            if alt[i] < alt_trop:
+                result[i] = 100
+            if alt[i] >= alt_trop:
+                result[i] = 100 + (alt[i] - alt_trop) * \
+                    ((250 - 100)/(alt_strat - alt_trop))
+            if alt[i] >= alt_strat:
+                result[i] = 250
+        return result
 
 
 class NitridAcid(ErrorEstimation):
