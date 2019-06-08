@@ -373,7 +373,7 @@ class ErrorEstimation:
             # above stratosphere
             if alt[i] > alt_strat:
                 sig[i] = 10000
-        return sig
+        return sig * f_sigma
 
     def _get_amp_and_sig_temp(self, alt, alt0, alt_trop):
         """Get amplitude and deviation for atmospheric temperature
@@ -609,7 +609,7 @@ class GreenhouseGas(ErrorEstimation):
         s_cov_ghg[nol:, nol:] = s_cov
         return s_cov_ghg
 
-    def _amplitude(self, event, alt_strat) -> np.ndarray:
+    def _amplitude(self, event, alt_strat=25000) -> np.ndarray:
         """Amplitude for GHG"""
         nol = self.nol.data[event]
         alt = self.alt.data[event, :nol]
