@@ -510,7 +510,7 @@ class WaterVapour(ErrorEstimation):
                 rc_type1 = P @ reconstructed
                 return self.smoothing_error(original_type1, rc_type1, s_cov)
 
-    def assumed_covariance(self, event: int, alt_strat=25000, f_sigma=1.) -> np.ndarray:
+    def assumed_covariance(self, event: int, alt_strat=25000, f_sigma=1., return_tuple=False) -> np.ndarray:
         """Assumed covariance for both H2O and HDO"""
         nol = self.nol.data[event]
         alt = self.alt.data[event, :nol]
@@ -528,6 +528,10 @@ class WaterVapour(ErrorEstimation):
             amp_H2O[ires] = res[0]
             amp_dD[ires] = res[1]
             sigma[ires] = res[2]
+
+        # only for debug purpose
+        if return_tuple:
+            return amp_H2O, amp_dD, sigma
 
         S_H2O = amp_H2O[:, np.newaxis] * amp_H2O[np.newaxis, :] \
             * np.exp(-(alt[:, np.newaxis] - alt[np.newaxis, :])**2 / (2 * sigma[:, np.newaxis] * sigma[np.newaxis, :]))
