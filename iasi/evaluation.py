@@ -312,7 +312,7 @@ class ErrorEstimation:
         """Calulate smooting error with two matrices and assumed covariance"""
         return (actual_matrix - to_compare) @ assumed_covariance @ (actual_matrix - to_compare).T
 
-    def assumed_covariance_temperature(self, event: int) -> np.ndarray:
+    def assumed_covariance_temperature(self, event: int, return_tuple=False) -> np.ndarray:
         """Return assumed covariance for temperature cross averaging kernel"""
         nol = self.nol.data[event]
         amp_T = np.zeros(nol)
@@ -327,6 +327,9 @@ class ErrorEstimation:
         for ires, res in enumerate(results):
             amp_T[ires] = res[0]
             sigma_T[ires] = res[1]
+        
+        if return_tuple:
+            return amp_T, sigma_T
 
         SaT = amp_T[:, np.newaxis] * amp_T[np.newaxis, :] \
             * np.exp(-(alt[:, np.newaxis] - alt[np.newaxis])**2 / (2 * sigma_T[:, np.newaxis] * sigma_T[np.newaxis, :]))
