@@ -17,31 +17,42 @@ nol = nol.data[0]
 alt = alt.data[0, :nol]
 alt_trop = alt_trop.data[0]
 
+
 def default_color(i: int):
     return plt.rcParams['axes.prop_cycle'].by_key()['color'][i]
 
 # %% [markdown]
 
-# Water Vapour
+
+# ## Water Vapour
 cov = wv.assumed_covariance(0)
 amp_H2O, amp_delD, sigma = wv.assumed_covariance(0, return_tuple=True)
 
-plt.imshow(cov)
+plt.imshow(cov[:nol, :nol])
 plt.colorbar()
+plt.xlabel('level')
+plt.ylabel('level')
+plt.show()
+
+plt.imshow(cov[nol:, nol:])
+plt.colorbar()
+plt.xlabel('level')
+plt.ylabel('level')
 plt.show()
 
 
-fig, ax1 = plt.subplots()
+fig, ax1 = plt.subplots(figsize=(4, 4))
 
 # stratosphere
 ax1.axhline(25, color='gray', linestyle='dotted')
-ax1.text(1, 26, 'stratosphere',  color='gray')
+text_pos = 0.8
+ax1.text(text_pos, 26, 'stratosphere',  color='gray')
 # tropopause
 ax1.axhline(alt_trop / 1000, color='gray', linestyle='dotted')
-ax1.text(1, (alt_trop / 1000) + 1, 'tropopause', color='gray')
+ax1.text(text_pos, (alt_trop / 1000) + 1, 'tropopause', color='gray')
 # 5km
 ax1.axhline(5, color='gray', linestyle='dotted')
-ax1.text(1, 6, '5 km', color='gray')
+ax1.text(text_pos, 6, '5 km', color='gray')
 
 
 # plot amplitudes (ax1)
@@ -64,16 +75,49 @@ plt.show()
 
 # %% [markdown]
 
-# Greenhouse gases
+# ## Greenhouse gases
 cov = ghg.assumed_covariance(0)
-
-plt.imshow(cov)
+plt.imshow(cov[:nol, :nol])
 plt.colorbar()
+plt.xlabel('level')
+plt.ylabel('level')
 plt.show()
+
+
+fig, ax1 = plt.subplots(figsize=(4, 4))
+# stratosphere
+ax1.axhline(25, color='gray', linestyle='dotted')
+text_pos = 0.19
+ax1.text(text_pos, 26, 'stratosphere',  color='gray')
+# tropopause
+ax1.axhline(alt_trop / 1000, color='gray', linestyle='dotted')
+ax1.text(text_pos, (alt_trop / 1000) + 1, 'tropopause', color='gray')
+
+sig = ghg.sigma(0, 0.6)
+amp = ghg._amplitude(0)
+
+# plot amplitudes (ax1)
+c_amp = default_color(0)
+ax1.plot(amp, alt / 1000, color=c_amp, linestyle='-')
+ax1.set_ylabel('altitude [km]')
+ax1.set_xlabel('amplitude')
+ax1.xaxis.label.set_color(c_amp)
+ax1.tick_params(axis='x', colors=c_amp)
+
+# plot standard deviation (ax2)
+c_sig = default_color(1)
+ax2 = ax1.twiny()
+ax2.plot(sigma, alt / 1000, color=c_sig)
+ax2.set_xlabel('standard deviation')
+ax2.tick_params(axis='x', colors=c_sig)
+ax2.xaxis.label.set_color(c_sig)
+plt.show()
+
 # %% [markdown]
 
-# Nitrid Acid
+# ## Nitrid Acid
 cov = hno3.assumed_covariance(0)
+sig = hno3.sigma(0, f_sigma=1.2)
 
 plt.imshow(cov)
 plt.colorbar()
