@@ -32,7 +32,14 @@ def project_alt_to_index(alt_ref) -> float:
             alt_prev = alt_i
 
 
-def plot_std_and_amp(sig, amp, text_pos=1, alt_strat=25000):
+def plot_covariance(s_cov):
+    plt.imshow(s_cov)
+    plt.xlabel('altitude [level]')
+    plt.ylabel('altitude [level]')
+    plt.colorbar()
+
+
+def plot_std_and_amp(sigma, amp, text_pos=1, alt_strat=25000):
     fig, ax1 = plt.subplots(figsize=(4, 4))
     # stratosphere
     alt_s = project_alt_to_index(alt_strat)
@@ -70,16 +77,10 @@ def plot_std_and_amp(sig, amp, text_pos=1, alt_strat=25000):
 cov = wv.assumed_covariance(0)
 amp_H2O, amp_delD, sigma = wv.assumed_covariance(0, return_tuple=True)
 
-plt.imshow(cov[:nol, :nol])
-plt.colorbar()
-plt.xlabel('level')
-plt.ylabel('level')
+plot_covariance(cov[:nol, :nol])
 plt.show()
 
-plt.imshow(cov[nol:, nol:])
-plt.colorbar()
-plt.xlabel('level')
-plt.ylabel('level')
+plot_covariance(cov[nol:, nol:])
 plt.show()
 
 text_pos = 0.8
@@ -95,13 +96,10 @@ plt.show()
 
 # ## Greenhouse gases
 cov = ghg.assumed_covariance(0)
-plt.imshow(cov[:nol, :nol])
-plt.colorbar()
-plt.xlabel('level')
-plt.ylabel('level')
+plot_covariance(cov[:nol, :nol])
 plt.show()
 
-sig = ghg.sigma(0, f_sigma= 0.6)
+sig = ghg.sigma(0, f_sigma=0.6)
 amp = ghg._amplitude(0)
 
 plot_std_and_amp(sig, amp, text_pos=0.18)
@@ -111,8 +109,7 @@ plt.show()
 
 # ## Nitrid Acid
 cov = hno3.assumed_covariance(0)
-plt.imshow(cov)
-plt.colorbar()
+plot_covariance(cov)
 plt.show()
 
 sig = hno3.sigma(0, f_sigma=1.2)
@@ -136,8 +133,7 @@ plt.show()
 # ## Temperature
 
 cov = tatm.assumed_covariance_temperature(0)
-plt.imshow(cov)
-plt.colorbar()
+plot_covariance(cov)
 plt.show()
 
 text_pos = 1.55
