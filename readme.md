@@ -157,6 +157,12 @@ task = CompressDataset(file='test/resources/MOTIV-single-event.nc', dst='data')
 luigi.build([task], local_scheduler=True, workers=1)
 ```
 
+For compression of multiple files have a look at [slurm compression script](script/compression-job.sh).
+__Warning:__ If you run many tasks on multiple nodes, the central luigi scheduler may be overloaded. As a workaround you can use the local scheduler.
+But in this case you have to take care for splitting date into chunks
+since there is no central component coordinating multiple compute node. 
+
+
 #### Common Task Parameters
 
 - `--file`: file to process
