@@ -1,9 +1,10 @@
 # %%
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from netCDF4 import Dataset
-import iasi.evaluation as eval
 import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from netCDF4 import Dataset
+
+import iasi.evaluation as eval
 
 nc = Dataset('test/resources/MOTIV-single-event.nc')
 alt = nc['atm_altitude'][...]
@@ -37,6 +38,7 @@ def plot_covariance(s_cov):
     fig = plt.figure(figsize=(4, 4))
     ax = plt.gca()
     im = ax.imshow(s_cov)
+    plt.ylim(-0.5, nol-0.5)
     plt.xlabel('altitude [level]')
     plt.ylabel('altitude [level]')
 
