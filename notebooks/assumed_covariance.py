@@ -60,6 +60,7 @@ def plot_std_and_amp(sigma, amp, text_pos=1, alt_strat=25000):
     c_amp = default_color(0)
     if len(amp) == 2:
         ax1.plot(amp[0], np.arange(nol), color=c_amp, linestyle='-')
+        # scale amp delD by to for better visualization
         ax1.plot(amp[1], np.arange(nol), color=c_amp, linestyle='-.')
     else:
         ax1.plot(amp, np.arange(nol), color=c_amp, linestyle='-')
@@ -81,7 +82,8 @@ def plot_std_and_amp(sigma, amp, text_pos=1, alt_strat=25000):
 # %% [markdown]
 # ## Water Vapour
 cov = wv.assumed_covariance(0)
-amp_H2O, amp_delD, sigma = wv.assumed_covariance(0, return_tuple=True)
+amp_H2O, amp_delD = wv.amplitude(0)
+sig = wv.sigma(0)
 
 plot_covariance(cov[:nol, :nol])
 plt.savefig('wv_cov_H2O.pdf')
@@ -92,7 +94,7 @@ plt.savefig('wv_cov_HDO.pdf')
 plt.show()
 
 text_pos = 0.8
-ax1, ax2 = plot_std_and_amp(sigma, [amp_H2O, amp_delD], text_pos=text_pos)
+ax1, ax2 = plot_std_and_amp(sig, [amp_H2O, amp_delD], text_pos=text_pos)
 # 5km
 alt_5 = project_alt_to_index(5000)
 ax1.axhline(alt_5, color='gray', linestyle='dotted')
@@ -109,8 +111,8 @@ plot_covariance(cov[:nol, :nol])
 plt.savefig('ghg_cov.pdf')
 plt.show()
 
-sig = ghg.sigma(0, f_sigma=0.6)
-amp = ghg._amplitude(0)
+sig = ghg.sigma(0)
+amp = ghg.amplitude(0)
 
 plot_std_and_amp(sig, amp, text_pos=0.18)
 plt.savefig('ghg_amp_sig.pdf', bbox_inches='tight')
@@ -124,8 +126,8 @@ plot_covariance(cov)
 plt.savefig('hno3_cov.pdf')
 plt.show()
 
-sig = hno3.sigma(0, f_sigma=1.2)
-amp = hno3._amplitude(0)
+sig = hno3.sigma(0)
+amp = hno3.amplitude(0)
 
 text_pos = 1.3
 ax1, ax2 = plot_std_and_amp(sig, amp, text_pos=text_pos)
@@ -151,7 +153,8 @@ plt.savefig('tatm_cov.pdf')
 plt.show()
 
 text_pos = 1.55
-amp, sig = tatm.assumed_covariance_temperature(0, return_tuple=True)
+amp = tatm.amplitude(0)
+sig = tatm.sigma(0)
 ax1, ax2 = plot_std_and_amp(sig, amp, text_pos=text_pos)
 
 srf_4 = project_alt_to_index(alt[0] + 4000)
