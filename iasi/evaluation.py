@@ -195,6 +195,8 @@ class VariableErrorEstimation(FileTask):
 
 class ErrorEstimation:
     levels_of_interest = []
+    # assume statosphere starting at 25 km
+    alt_strat = 25000
 
     @staticmethod
     def factory(gas: str, nol, alt, avk, alt_trop=None):
@@ -312,29 +314,11 @@ class ErrorEstimation:
         """Calulate smooting error with two matrices and assumed covariance"""
         return (actual_matrix - to_compare) @ assumed_covariance @ (actual_matrix - to_compare).T
 
-    def assumed_covariance_temperature(self, event: int, return_tuple=False) -> np.ndarray:
+    def assumed_covariance_temperature(self, event: int) -> np.ndarray:
         """Return assumed covariance for temperature cross averaging kernel"""
-        nol = self.nol.data[event]
-        amp_T = np.zeros(nol)
-        sigma_T = np.zeros(nol)
-        alt = self.alt.data[event, :nol]
-
-        fct_partial = partial(self._get_amp_and_sig_temp,
-                              alt0=alt[0],
-                              alt_trop=self.alt_trop.data[event])
-        results = map(fct_partial, alt)
-
-        for ires, res in enumerate(results):
-            amp_T[ires] = res[0]
-            sigma_T[ires] = res[1]
-        
-        if return_tuple:
-            return amp_T, sigma_T
-
-        SaT = amp_T[:, np.newaxis] * amp_T[np.newaxis, :] \
-            * np.exp(-(alt[:, np.newaxis] - alt[np.newaxis])**2 / (2 * sigma_T[:, np.newaxis] * sigma_T[np.newaxis, :]))
-        SaT = np.asarray(SaT.T)  # , dtype='float32')
-        return SaT
+        sig = self.sigma(event)
+        amp = self.amplitude_temperature(event)
+        return self.construct_covariance_matrix(event, amp, sig)
 
     def construct_covariance_matrix(self, event, amp: np.ndarray, sig: np.ndarray) -> np.ndarray:
         """create a covariance matrix by amplitude and deviation
@@ -352,13 +336,13 @@ class ErrorEstimation:
                            (2 * sig[i] * sig[j]))
         return sa
 
-    def sigma(self, event, alt_strat=25000, f_sigma: float = 1) -> np.ndarray:
-        """Standard deviation for levels in meters. Used by GHG and HNO3.
+    def sigma(self, event, f_sigma: float = 0.6) -> np.ndarray:
+        """Assumed correlation length for all gases and temperature.
 
-        :param alt_strat:   altitude of stratosphere in meters
+        :param self.alt_strat:   altitude of stratosphere in meters
         :param f_sigma:     scaling factor
 
-        :return: array of dst for each level
+        :return: correlation length for each level
         """
         nol = self.nol.data[event]
         alt = self.alt.data[event]
@@ -370,59 +354,49 @@ class ErrorEstimation:
                 sig[i] = 2500 + (alt[i] - alt[0]) * \
                     ((5000-2500)/(alt_trop-alt[0]))
             # inside statrophere
-            if alt[i] >= alt_trop and alt[i] < alt_strat:
+            if alt[i] >= alt_trop and alt[i] < self.alt_strat:
                 sig[i] = 5000+(alt[i]-alt_trop) * \
-                    ((10000-5000)/(alt_strat-alt_trop))
+                    ((10000-5000)/(self.alt_strat-alt_trop))
             # above stratosphere
-            if alt[i] > alt_strat:
+            if alt[i] > self.alt_strat:
                 sig[i] = 10000
         return sig * f_sigma
 
-    def _get_amp_and_sig_temp(self, alt, alt0, alt_trop):
+    def amplitude(self, event):
+        raise NotImplementedError
+
+    def amplitude_temperature(self, event) -> np.ndarray:
         """Get amplitude and deviation for atmospheric temperature
-        
-        :return: (amp, sig)
+
+        :return: amp
         """
-        if alt0+4000 < alt_trop:
-            # setting amp_T
-            if alt <= alt0+4000:
-                amp_T = 2.0 - 1.0 * (alt - alt0) / 4000
-            elif alt >= alt0+4000 and alt <= alt_trop:
-                amp_T = 1.
-            elif alt > alt_trop and alt <= alt_trop+5000:
-                amp_T = 1.0 + 0.5 * (alt - alt_trop) / 5000
-            elif alt > alt_trop+5000:
-                amp_T = 1.5
-
-            # setting sigmaT
-            if alt < alt_trop:
-                sigmaT = 2500 * (1 + (alt - alt0) / (alt_trop - alt0))
-            elif alt >= alt_trop and alt < alt_trop+10000:
-                sigmaT = 5000 * (1 + (alt - alt_trop) / 10000)
-            elif alt >= alt_trop+10000:
-                sigmaT = 10000
-        else:
-            # setting amp_T
-            if alt < alt_trop:
-                amp_T = 2.0 - 1.0 * (alt - alt0) / (alt_trop - alt0)
-            elif alt == alt_trop:
-                amp_T = 1.
-            elif alt > alt_trop and alt <= alt_trop+5000:
-                amp_T = 1.0 + 0.5 * (alt - alt_trop) / 5000
-            elif alt > alt_trop+5000:
-                amp_T = 1.5
-
-            # setting sigmaT
-            if alt < alt_trop:
-                sigmaT = 2500 * (1 + (alt - alt0) / (alt_trop - alt0))
-            elif alt >= alt_trop and alt < alt_trop+10000:
-                sigmaT = 5000 * (1 + (alt - alt_trop) / 10000)
-            elif alt >= alt_trop+10000:
-                sigmaT = 10000
-
-        sigmaT = sigmaT * 3/5  # 0.2
-
-        return amp_T, sigmaT
+        nol = self.nol.data[event]
+        alt = self.alt.data[event, :nol]
+        alt_trop = self.alt_trop.data[event]
+        amp = np.ndarray(nol)
+        for i in range(nol):
+            if alt[0]+4000 < alt_trop:
+                # setting amp_T
+                if alt[i] <= alt[0]+4000:
+                    amp[i] = 2.0 - 1.0 * (alt[i] - alt[0]) / 4000
+                elif alt[i] >= alt[0]+4000 and alt[i] <= alt_trop:
+                    amp[i] = 1.
+                elif alt[i] > alt_trop and alt[i] <= alt_trop+5000:
+                    amp[i] = 1.0 + 0.5 * (alt[i] - alt_trop) / 5000
+                elif alt[i] > alt_trop+5000:
+                    amp[i] = 1.5
+            else:
+                # setting amp[i]
+                if alt[i] < alt_trop:
+                    amp[i] = 2.0 - 1.0 * (alt[i] - alt[0]) / \
+                        (alt_trop - alt[0])
+                elif alt[i] == alt_trop:
+                    amp[i] = 1.
+                elif alt[i] > alt_trop and alt[i] <= alt_trop+5000:
+                    amp[i] = 1.0 + 0.5 * (alt[i] - alt_trop) / 5000
+                elif alt[i] > alt_trop+5000:
+                    amp[i] = 1.5
+        return amp
 
 
 class WaterVapour(ErrorEstimation):
@@ -460,8 +434,6 @@ class WaterVapour(ErrorEstimation):
             else:
                 # type 1 reconstruction error
                 rc_type1 = covariance.type1_of(reconstructed)
-                # _calc_Sa_(covariance.nol, covariance.alt,
-                #           covariance.alt[0], None, alt_strat=25000)
                 return self.smoothing_error(original_type1, rc_type1, s_cov)
 
     def noise_matrix(self, event: int, original: np.ndarray, reconstruced: np.ndarray, covariance: Covariance, type2=False, avk=None) -> np.ndarray:
@@ -513,68 +485,46 @@ class WaterVapour(ErrorEstimation):
                 rc_type1 = P @ reconstructed
                 return self.smoothing_error(original_type1, rc_type1, s_cov)
 
-    def assumed_covariance(self, event: int, alt_strat=25000, f_sigma=1., return_tuple=False) -> np.ndarray:
+    def assumed_covariance(self, event: int) -> np.ndarray:
         """Assumed covariance for both H2O and HDO"""
         nol = self.nol.data[event]
-        alt = self.alt.data[event, :nol]
-        amp_H2O = np.zeros(nol)  # , dtype='float64')
-        amp_dD = np.zeros(nol)  # , dtype='float64')
-        sigma = np.zeros(nol)  # , dtype='float64')
-        fct_partial = partial(self._get_amp_and_sig,
-                              alt0=alt[0],
-                              alt_trop=self.alt_trop.data[event],
-                              alt_strat=alt_strat,
-                              f_sigma=f_sigma)
-        results = map(fct_partial, alt)
-
-        for ires, res in enumerate(results):
-            amp_H2O[ires] = res[0]
-            amp_dD[ires] = res[1]
-            sigma[ires] = res[2]
-
-        # only for debug purpose
-        if return_tuple:
-            return amp_H2O, amp_dD, sigma
-
-        S_H2O = amp_H2O[:, np.newaxis] * amp_H2O[np.newaxis, :] \
-            * np.exp(-(alt[:, np.newaxis] - alt[np.newaxis, :])**2 / (2 * sigma[:, np.newaxis] * sigma[np.newaxis, :]))
-        S_dD = amp_dD[:, np.newaxis] * amp_dD[np.newaxis, :] \
-            * np.exp(-(alt[:, np.newaxis] - alt[np.newaxis, :])**2 / (2 * sigma[:, np.newaxis] * sigma[np.newaxis, :]))
-
-        S_H2O = np.asarray(S_H2O)  # , dtype='float32')
-        S_dD = np.asarray(S_dD)  # ,  dtype='float32')
-
-        Sa_ = np.zeros([2*nol, 2*nol])  # , dtype='float32')
-        Sa_[:nol, :nol] = S_H2O
-        Sa_[nol:, nol:] = S_dD
+        amp_H2O, amp_dD = self.amplitude(event)
+        sig = self.sigma(event)
+        Sa_ = np.zeros([2*nol, 2*nol])
+        # Sa H2O
+        Sa_[:nol, :nol] = self.construct_covariance_matrix(event, amp_H2O, sig)
+        # Sa delD
+        Sa_[nol:, nol:] = self.construct_covariance_matrix(event, amp_dD, sig)
         return Sa_
 
-    def _get_amp_and_sig(self, alt: float, alt0: float, alt_trop: float, alt_strat=25000, f_sigma=1.):
-        """Calculate amplitud for H2O and HDO as well as std
+    def amplitude(self, event):
+        """Calculate amplitude for H2O and HDO as well as std
 
-        :return: (amp_H2O, amp_dD, sigma)
+        :return: (amp_H2O, amp_dD)
         """
-        if alt < 5000.:
-            amp_H2O = 0.75 * (1 + alt / 5000)
-            amp_dD = 0.09 * (1 + alt / 5000)
-            sigma = f_sigma * 1500. * (1. + (alt - alt0) / (alt_trop - alt0))
-        elif alt >= 5000. and alt < alt_trop:
-            amp_H2O = 1.5
-            amp_dD = 0.18
-            sigma = f_sigma * 1500. * (1. + (alt - alt0) / (alt_trop - alt0))
-        elif alt >= alt_trop and alt < alt_strat:
-            amp_H2O = 1.5 - 1.2 * (alt - alt_trop) / (alt_strat - alt_trop)
-            amp_dD = 0.18 - 0.12 * (alt - alt_trop) / (alt_strat - alt_trop)
-            sigma = f_sigma * 3000. * \
-                (1. + (alt - alt_trop) / (alt_strat - alt_trop))
-        elif alt >= alt_strat:
-            amp_H2O = 0.3
-            amp_dD = 0.06
-            sigma = f_sigma * 6000.
-        else:
-            raise ValueError('Invalid altitude')
-
-        return amp_H2O, amp_dD, sigma
+        nol = self.nol.data[event]
+        alt = self.alt.data[event, :nol]
+        alt_trop = self.alt_trop.data[event]
+        amp_H2O = np.ndarray(nol)
+        amp_dD = np.ndarray(nol)
+        for i in range(nol):
+            if alt[i] < 5000.:
+                amp_H2O[i] = 0.75 * (1 + alt[i] / 5000)
+                amp_dD[i] = 0.09 * (1 + alt[i] / 5000)
+            elif alt[i] >= 5000. and alt[i] < alt_trop:
+                amp_H2O[i] = 1.5
+                amp_dD[i] = 0.18
+            elif alt[i] >= alt_trop and alt[i] < self.alt_strat:
+                amp_H2O[i] = 1.5 - 1.2 * \
+                    (alt[i] - alt_trop) / (self.alt_strat - alt_trop)
+                amp_dD[i] = 0.18 - 0.12 * \
+                    (alt[i] - alt_trop) / (self.alt_strat - alt_trop)
+            elif alt[i] >= self.alt_strat:
+                amp_H2O[i] = 0.3
+                amp_dD[i] = 0.06
+            else:
+                raise ValueError('Invalid altitude')
+        return amp_H2O, amp_dD
 
 
 class GreenhouseGas(ErrorEstimation):
@@ -602,9 +552,9 @@ class GreenhouseGas(ErrorEstimation):
         else:
             return np.absolute(original - reconstructed)
 
-    def assumed_covariance(self, event, alt_strat=25000) -> np.ndarray:
-        amp = self._amplitude(event, alt_strat)
-        sig = self.sigma(event, alt_strat=alt_strat, f_sigma=0.6)
+    def assumed_covariance(self, event) -> np.ndarray:
+        amp = self.amplitude(event)
+        sig = self.sigma(event)
         s_cov = self.construct_covariance_matrix(event, amp, sig)
         nol = self.nol.data[event]
         s_cov_ghg = np.zeros((2 * nol, 2 * nol))
@@ -612,7 +562,7 @@ class GreenhouseGas(ErrorEstimation):
         s_cov_ghg[nol:, nol:] = s_cov
         return s_cov_ghg
 
-    def _amplitude(self, event, alt_strat=25000) -> np.ndarray:
+    def amplitude(self, event) -> np.ndarray:
         """Amplitude for GHG"""
         nol = self.nol.data[event]
         alt = self.alt.data[event, :nol]
@@ -623,8 +573,8 @@ class GreenhouseGas(ErrorEstimation):
                 amp[i] = 0.1
             if alt[i] >= alt_trop:
                 amp[i] = 0.1 + (alt[i] - alt_trop) * \
-                    ((0.25 - 0.1)/(alt_strat - alt_trop))
-            if alt[i] >= alt_strat:
+                    ((0.25 - 0.1)/(self.alt_strat - alt_trop))
+            if alt[i] >= self.alt_strat:
                 amp[i] = 0.25
         return amp
 
@@ -653,12 +603,12 @@ class NitridAcid(ErrorEstimation):
         else:
             return np.absolute(original - reconstructed)
 
-    def assumed_covariance(self, event, alt_strat=25000) -> np.ndarray:
-        amp = self._amplitude(event, alt_strat=alt_strat)
-        sig = self.sigma(event, alt_strat=alt_strat, f_sigma=1.2)
+    def assumed_covariance(self, event) -> np.ndarray:
+        amp = self.amplitude(event)
+        sig = self.sigma(event)
         return self.construct_covariance_matrix(event, amp, sig)
 
-    def _amplitude(self, event: int, alt_strat=25000):
+    def amplitude(self, event: int):
         """Amplitude of HNO3"""
         nol = self.nol.data[event]
         alt = self.alt.data[event, :nol]
