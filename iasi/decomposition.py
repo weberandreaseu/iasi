@@ -111,7 +111,6 @@ class SingularValueDecomposition(Decomposition):
                 U, s, Vh = la.svd(matrix.data, full_matrices=False, lapack_driver='gesdd')
             except np.linalg.LinAlgError as err:
                 logger.error(f'{err} at {self.target_path()}:{event}')
-                raise err
             if np.iscomplex(U).any():
                 raise ValueError(
                     f'Left-singuar values are complex for {self.target_path()}:{event}')
