@@ -47,7 +47,7 @@ def plot_covariance(s_cov):
     plt.colorbar(im, cax=cax)
 
 
-def plot_std_and_amp(sigma, amp, text_pos=1, alt_strat=25000):
+def plot_amplitude(*amps, text_pos=1, alt_strat=25000):
     fig, ax1 = plt.subplots(figsize=(4, 4))
     # stratosphere
     alt_s = project_alt_to_index(alt_strat)
@@ -59,27 +59,52 @@ def plot_std_and_amp(sigma, amp, text_pos=1, alt_strat=25000):
     ax1.text(text_pos, (alt_t) + 0.6, 'tropopause', color='gray')
 
     # plot amplitudes (ax1)
-    c_amp = default_color(0)
-    if len(amp) == 2:
-        ax1.plot(amp[0], np.arange(nol), color=c_amp, linestyle='-')
-        # scale amp delD by to for better visualization
-        ax1.plot(amp[1], np.arange(nol), color=c_amp, linestyle='-.')
-    else:
-        ax1.plot(amp, np.arange(nol), color=c_amp, linestyle='-')
+
+    for amp in amps:
+        ax1.plot(amp, np.arange(nol))
+
+    # c_amp = default_color(0)
+    # if len(amp) == 2:
+    #     ax1.plot(amp[0], np.arange(nol), color=c_amp, linestyle='-')
+    #     # scale amp delD by to for better visualization
+    #     ax1.plot(amp[1], np.arange(nol), color=c_amp, linestyle='-.')
+    # else:
+    #     ax1.plot(amp, np.arange(nol), color=c_amp, linestyle='-')
     ax1.set_ylabel('altitude [level]')
-    ax1.set_xlabel('amplitude')
-    ax1.xaxis.label.set_color(c_amp)
-    ax1.tick_params(axis='x', colors=c_amp)
+    ax1.set_xlabel('standard deviation [ln(ppmv)]')
+    # ax1.xaxis.label.set_color(c_amp)
+    # ax1.tick_params(axis='x', colors=c_amp)
 
-    # plot standard deviation (ax2)
-    c_sig = default_color(1)
-    ax2 = ax1.twiny()
-    ax2.plot(sigma / 1000, np.arange(nol), color=c_sig)
-    ax2.set_xlabel('standard deviation [km]')
-    ax2.tick_params(axis='x', colors=c_sig)
-    ax2.xaxis.label.set_color(c_sig)
-    return ax1, ax2
+    # # plot standard deviation (ax2)
+    # c_sig = default_color(1)
+    # ax2 = ax1.twiny()
+    # ax2.plot(sigma / 1000, np.arange(nol), color=c_sig)
+    # ax2.set_xlabel('standard deviation [km]')
+    # ax2.tick_params(axis='x', colors=c_sig)
+    # ax2.xaxis.label.set_color(c_sig)
+    return ax1
 
+
+# %% [markdown]
+# ## Correlation length
+# Same for all gases and atmosphere
+
+def plot_correlation_lenght(sig, alt_strat=25000, text_pos=1.4):
+    fig, ax1 = plt.subplots(figsize=(4, 4))
+    # stratosphere
+    alt_s = project_alt_to_index(alt_strat)
+    ax1.axhline(alt_s, color='gray', linestyle='dotted')
+    ax1.text(text_pos, alt_s + 0.6, 'stratosphere',  color='gray')
+    # tropopause
+    alt_t = project_alt_to_index(alt_trop)
+    ax1.axhline(alt_t, color='gray', linestyle='dotted')
+    ax1.text(text_pos, (alt_t) + 0.6, 'tropopause', color='gray')
+    plt.plot(sig / 1000, np.arange(nol))
+    plt.ylabel('altitude [level]')
+    plt.xlabel('correlation length [km]')
+
+sig = wv.sigma(0)
+plot_correlation_lenght(sig)
 
 # %% [markdown]
 # ## Water Vapour
@@ -96,7 +121,7 @@ plt.savefig('wv_cov_HDO.pdf')
 plt.show()
 
 text_pos = 0.8
-ax1, ax2 = plot_std_and_amp(sig, [amp_H2O, amp_delD], text_pos=text_pos)
+ax1 = plot_amplitude(amp_H2O, amp_delD, text_pos=text_pos)
 # 5km
 alt_5 = project_alt_to_index(5000)
 ax1.axhline(alt_5, color='gray', linestyle='dotted')
@@ -116,7 +141,7 @@ plt.show()
 sig = ghg.sigma(0)
 amp = ghg.amplitude(0)
 
-plot_std_and_amp(sig, amp, text_pos=0.18)
+plot_amplitude(amp, text_pos=0.18)
 plt.savefig('ghg_amp_sig.pdf', bbox_inches='tight')
 plt.show()
 
@@ -132,7 +157,7 @@ sig = hno3.sigma(0)
 amp = hno3.amplitude(0)
 
 text_pos = 1.3
-ax1, ax2 = plot_std_and_amp(sig, amp, text_pos=text_pos)
+ax1 = plot_amplitude(amp, text_pos=text_pos)
 
 tropo_4 = project_alt_to_index(alt_trop - 4000)
 ax1.axhline(tropo_4, color='gray', linestyle='dotted')
@@ -155,9 +180,9 @@ plt.savefig('tatm_cov.pdf')
 plt.show()
 
 text_pos = 1.55
-amp = tatm.amplitude(0)
+amp = tatm.amplitude_temperature(0)
 sig = tatm.sigma(0)
-ax1, ax2 = plot_std_and_amp(sig, amp, text_pos=text_pos)
+ax1 = plot_amplitude(amp, text_pos=text_pos)
 
 srf_4 = project_alt_to_index(alt[0] + 4000)
 ax1.axhline(srf_4, color='gray', linestyle='dotted')
