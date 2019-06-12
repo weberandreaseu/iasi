@@ -1,8 +1,13 @@
-import pandas as pd
-import luigi
 import unittest
 
-from iasi.evaluation import EvaluationCompressionSize, EvaluationErrorEstimation
+import luigi
+import numpy as np
+import pandas as pd
+from netCDF4 import Dataset
+
+import iasi.evaluation as eval
+from iasi.evaluation import (EvaluationCompressionSize,
+                             EvaluationErrorEstimation)
 
 
 class TestEvaluation(unittest.TestCase):
@@ -111,3 +116,23 @@ class TestEvaluation(unittest.TestCase):
 
     def test_atmospheric_temperature_report_exists(self):
         self.assertGreater(len(self.hno3), 0)
+
+
+class TestErrorEstimation(unittest.TestCase):
+
+    def test_correlation_lenght_is_consistent(self):
+        """all gases should have the same correlation lenth"""
+        
+        nc = Dataset('test/resources/MOTIV-single-event.nc')
+        alt = nc['atm_altitude'][...]
+        nol = nc['atm_nol'][...]
+        alt_trop = nc['tropopause_altitude'][...]
+
+        wv = eval.WaterVapour('WV', nol, alt, None, alt_trop=alt_trop)
+        ghg = eval.GreenhouseGas('GHG', nol, alt, alt_trop=alt_trop)
+        hno3 = eval.NitridAcid('HNO3', nol, alt, alt_trop=alt_trop)
+        tatm = eval.NitridAcid('Tatm', nol, alt, alt_trop=alt_trop)
+
+        self.assertTrue(np.array_equal(wv.sigma(0), ghg.sigma(0)))
+        self.assertTrue(np.array_equal(wv.sigma(0), hno3.sigma(0)))
+        self.assertTrue(np.array_equal(wv.sigma(0), tatm.sigma(0)))
