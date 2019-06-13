@@ -218,6 +218,26 @@ class ErrorEstimation:
         self.gas = gas
         self.alt_trop = alt_trop
 
+    def matrix_ok(self, event, path, matrix):
+        ok = True
+        if np.ma.is_masked(matrix):
+            logger.warning(
+                'event %d contains masked values in %s. skipping...', event, path)
+            ok = False
+        if np.isnan(matrix).any():
+            logger.warning(
+                'event %d contains nan values in %s. skipping...', event, path)
+            ok = False
+        if np.isinf(matrix).any():
+            logger.warning(
+                'event %d contains inf values in %s. skipping...', event, path)
+            ok = False
+        if np.allclose(matrix, 0, atol=1e-14):
+            logger.warning(
+                'event %d contains zero or close to zero values in %s. skipping...', event, path)
+            ok = False
+        return ok
+
     def report_for(self, variable: Variable, original, reconstructed, rc_error) -> pd.DataFrame:
         # if not original.shape == reconstructed.shape:
         #     message = f'Different shape for {type(self).__name__} {variable.name}: original {original.shape}, reconstructed {reconstructed.shape}'
@@ -241,27 +261,30 @@ class ErrorEstimation:
                 f'No error estimation method for variable {variable.name}')
 
         reshaper = Quadrant.for_assembly(self.gas, variable.name, variable)
+        path = f'/state/{self.gas}/{variable.name}'
         for event in range(original.shape[0]):
             if np.ma.is_masked(self.nol[event]) or self.nol.data[event] > 29:
                 continue
             nol_event = self.nol.data[event]
+            if not self.matrix_ok(event, path, self.alt[event, :nol_event]):
+                continue
             covariance = Covariance(nol_event, self.alt[event])
             original_event = reshaper.transform(original[event], nol_event)
-            if original_event.mask.any():
-                logger.warn('Original array contains masked values')
+            if not self.matrix_ok(event, path, original_event):
+                continue
             # use reconstruced values iff rc_error flag is set
             if rc_error:
                 rc_event = reshaper.transform(reconstructed[event], nol_event)
-                if rc_event.mask.any():
-                    logger.warn('Reconstructed array contains masked values')
+                if not self.matrix_ok(event, path, rc_event):
+                    continue
                 rc_event = rc_event.data
             else:
                 rc_event = None
             if isinstance(self, WaterVapour):
                 avk_event = AssembleFourQuadrants(
                     nol_event).transform(self.avk[event], nol_event)
-                if avk_event.mask.any():
-                    logger.warn('Original avk contains masked values')
+                if not self.matrix_ok(event, 'wv_avk', avk_event):
+                    continue
                 avk_event = avk_event.data
             else:
                 avk_event = None
@@ -498,7 +521,7 @@ class WaterVapour(ErrorEstimation):
         return Sa_
 
     def amplitude(self, event):
-        """Calculate amplitude for H2O and HDO as well as std
+        """Calculate amplitude for H2O and HDO
 
         :return: (amp_H2O, amp_dD)
         """
@@ -511,10 +534,10 @@ class WaterVapour(ErrorEstimation):
             if alt[i] < 5000.:
                 amp_H2O[i] = 0.75 * (1 + alt[i] / 5000)
                 amp_dD[i] = 0.09 * (1 + alt[i] / 5000)
-            elif alt[i] >= 5000. and alt[i] < alt_trop:
+            elif 5000. <= alt[i] < alt_trop:
                 amp_H2O[i] = 1.5
                 amp_dD[i] = 0.18
-            elif alt[i] >= alt_trop and alt[i] < self.alt_strat:
+            elif alt_trop <= alt[i] < self.alt_strat:
                 amp_H2O[i] = 1.5 - 1.2 * \
                     (alt[i] - alt_trop) / (self.alt_strat - alt_trop)
                 amp_dD[i] = 0.18 - 0.12 * \
@@ -523,7 +546,7 @@ class WaterVapour(ErrorEstimation):
                 amp_H2O[i] = 0.3
                 amp_dD[i] = 0.06
             else:
-                raise ValueError('Invalid altitude')
+                raise ValueError(f'Invalid altitude at {event}')
         return amp_H2O, amp_dD
 
 
@@ -571,11 +594,13 @@ class GreenhouseGas(ErrorEstimation):
         for i in range(nol):
             if alt[i] < alt_trop:
                 amp[i] = 0.1
-            if alt[i] >= alt_trop:
+            elif alt_trop <= alt[i] < self.alt_strat:
                 amp[i] = 0.1 + (alt[i] - alt_trop) * \
                     ((0.25 - 0.1)/(self.alt_strat - alt_trop))
-            if alt[i] >= self.alt_strat:
+            elif alt[i] >= self.alt_strat:
                 amp[i] = 0.25
+            else:
+                raise ValueError('Invalid altitude')
         return amp
 
 
