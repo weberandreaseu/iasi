@@ -122,7 +122,7 @@ class TestErrorEstimation(unittest.TestCase):
 
     def test_correlation_lenght_is_consistent(self):
         """all gases should have the same correlation lenth"""
-        
+
         nc = Dataset('test/resources/MOTIV-single-event.nc')
         alt = nc['atm_altitude'][...]
         nol = nc['atm_nol'][...]
@@ -136,3 +136,15 @@ class TestErrorEstimation(unittest.TestCase):
         self.assertTrue(np.array_equal(wv.sigma(0), ghg.sigma(0)))
         self.assertTrue(np.array_equal(wv.sigma(0), hno3.sigma(0)))
         self.assertTrue(np.array_equal(wv.sigma(0), tatm.sigma(0)))
+
+    def test_invalid_altitude(self):
+        # event contains nan in alititued.
+        # if not clearly checked, test should fail because if value error: invalid altitude
+        task = EvaluationErrorEstimation(
+            file='test/resources/MOTIV-invalid-altitude.nc',
+            dst='/tmp/iasi',
+            force_upstream=True,
+            gases=['WV', 'GHG', 'HNO3', 'Tatm'],
+            variables=['avk', 'n', 'Tatmxavk']
+        )
+        assert luigi.build([task], local_scheduler=True)

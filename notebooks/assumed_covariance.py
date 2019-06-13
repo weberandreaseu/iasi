@@ -105,6 +105,8 @@ def plot_correlation_lenght(sig, alt_strat=25000, text_pos=1.4):
 
 sig = wv.sigma(0)
 plot_correlation_lenght(sig)
+plt.savefig('corr_length.pdf',  bbox_inches='tight')
+plt.show()
 
 # %% [markdown]
 # ## Water Vapour
@@ -113,11 +115,11 @@ amp_H2O, amp_delD = wv.amplitude(0)
 sig = wv.sigma(0)
 
 plot_covariance(cov[:nol, :nol])
-plt.savefig('wv_cov_H2O.pdf')
+plt.savefig('wv_cov_H2O.pdf', bbox_inches='tight')
 plt.show()
 
 plot_covariance(cov[nol:, nol:])
-plt.savefig('wv_cov_HDO.pdf')
+plt.savefig('wv_cov_HDO.pdf', bbox_inches='tight')
 plt.show()
 
 text_pos = 0.8
@@ -126,7 +128,7 @@ ax1 = plot_amplitude(amp_H2O, amp_delD, text_pos=text_pos)
 alt_5 = project_alt_to_index(5000)
 ax1.axhline(alt_5, color='gray', linestyle='dotted')
 ax1.text(text_pos, alt_5 + 0.6, '5 km', color='gray')
-plt.savefig('wv_amp_sig.pdf', bbox_inches='tight')
+plt.savefig('wv_std.pdf', bbox_inches='tight')
 plt.show()
 
 
@@ -135,14 +137,14 @@ plt.show()
 # ## Greenhouse gases
 cov = ghg.assumed_covariance(0)
 plot_covariance(cov[:nol, :nol])
-plt.savefig('ghg_cov.pdf')
+plt.savefig('ghg_cov.pdf', bbox_inches='tight')
 plt.show()
 
 sig = ghg.sigma(0)
 amp = ghg.amplitude(0)
 
 plot_amplitude(amp, text_pos=0.18)
-plt.savefig('ghg_amp_sig.pdf', bbox_inches='tight')
+plt.savefig('ghg_std.pdf', bbox_inches='tight')
 plt.show()
 
 # %% [markdown]
@@ -150,7 +152,7 @@ plt.show()
 # ## Nitrid Acid
 cov = hno3.assumed_covariance(0)
 plot_covariance(cov)
-plt.savefig('hno3_cov.pdf')
+plt.savefig('hno3_cov.pdf', bbox_inches='tight')
 plt.show()
 
 sig = hno3.sigma(0)
@@ -167,7 +169,7 @@ tropo_8 = project_alt_to_index(alt_trop + 8000)
 ax1.axhline(tropo_8, color='gray', linestyle='dotted')
 ax1.text(text_pos, tropo_8 + 0.6, 'tropopause + 8 km', color='gray')
 
-plt.savefig('hno3_amp_sig.pdf', bbox_inches='tight')
+plt.savefig('hno3_std.pdf', bbox_inches='tight')
 plt.show()
 
 # %% [markdown]
@@ -176,7 +178,7 @@ plt.show()
 
 cov = tatm.assumed_covariance_temperature(0)
 plot_covariance(cov)
-plt.savefig('tatm_cov.pdf')
+plt.savefig('tatm_cov.pdf', bbox_inches='tight')
 plt.show()
 
 text_pos = 1.55
@@ -192,6 +194,6 @@ tropo_5 = project_alt_to_index(alt_trop + 5000)
 ax1.axhline(tropo_5, color='gray', linestyle='dotted')
 ax1.text(text_pos, tropo_5 + 0.6, 'tropopause + 5 km', color='gray')
 
-plt.savefig('tatm_amp_sig.pdf', bbox_inches='tight')
+plt.savefig('tatm_std.pdf', bbox_inches='tight')
 
 plt.show()
