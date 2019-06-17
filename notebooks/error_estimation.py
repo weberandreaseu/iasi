@@ -17,6 +17,11 @@ from netCDF4 import Dataset
 
 thresholds = [1e-5, 1e-4, 1e-3, 1e-2, 0]
 
+# %% [markdown]
+
+# ## Data import
+# Import functions to read error and size from csv files
+
 
 def altitude_by(level_of_interest: int):
     map = {
@@ -38,7 +43,7 @@ def import_data(path_pattern: str,
                 threshold: float = None,
                 loi: int = None,
                 type: int = None,
-                inlcude_coordinates=True) -> pd.DataFrame:
+                inlcude_coordinates=False) -> pd.DataFrame:
     frames = []
     for file in glob.glob(path_pattern):
         frame = pd.read_csv(file, index_col=None, header=0)
@@ -81,6 +86,25 @@ def import_data(path_pattern: str,
     return pd.concat(frames, axis=0, ignore_index=True)
 
 
+def import_size(path_pattern: str):
+    frames = []
+    for file in glob.glob(path_pattern):
+        # frame = pd.read_csv(file, index_col=None, header=0)
+        frame = pd.read_csv(file)
+        if 'size' in frame:
+            frame['size'] = frame['size'] / 1000
+        datestring = file.split('_')[1]
+        date = datetime.strptime(datestring[:8], '%Y%m%d')
+        frame['date'] = date.date()
+        frames.append(frame)
+    return pd.concat(frames, axis=0, ignore_index=True)
+
+
+# %% [markdown]
+# ## Plot functions
+
+# Plot error and size for different seasons, threholds products etc.
+
 def plot_error_map(df, gas=None, var=None, season=None):
     ax = plt.axes(projection=ccrs.PlateCarree())
     sc = ax.scatter(
@@ -98,31 +122,7 @@ def plot_error_map(df, gas=None, var=None, season=None):
         plt.savefig(f'map_{gas}_{var}_{season}.pdf')
     plt.show()
 
-# %%
-# def aggregate_error(path_pattern: str):
-#     for file in glob.glob(path_pattern):
-#         df = import_data(file)
-#         aggregated = df.groupby(
-#             ['gas', 'var', 'threshold', 'level_of_interest', 'type'])['err'].mean()
-#         path, filename = os.path.split(file)
-#         target = os.path.join(path, 'aggregated', filename)
-#         aggregated.to_csv(
-#             target, header=['err'], index_label=['gas', 'var', 'threshold', 'level_of_interest', 'type'])
 
-
-# aggregate_error('data/motiv/error-estimation/*.csv')
-
-# # %%
-
-
-# def load_aggregated(path_pattern: str) -> pd.DataFrame:
-#     frames = []
-#     for file in glob.glob(path_pattern):
-#         frame = pd.read_csv(file, index_col=None, header=0)
-#         frames.append(frame)
-#     return pd.concat(frames, axis=0, ignore_index=True)
-
-# %%
 def plot_season_map(summer: pd.DataFrame, winter: pd.DataFrame):
     min_err = min(summer.err.min(), winter.err.min())
     max_err = max(summer.err.max(), winter.err.max())
@@ -133,7 +133,7 @@ def plot_season_map(summer: pd.DataFrame, winter: pd.DataFrame):
         summer.lat,
         c=summer['err'],
         marker='.',
-        s=2,
+        s=1,
         # log scale for error
         norm=colors.LogNorm(min_err, max_err),
         vmin=min_err,
@@ -147,7 +147,7 @@ def plot_season_map(summer: pd.DataFrame, winter: pd.DataFrame):
         winter.lat,
         c=winter['err'],
         marker='.',
-        s=2,
+        s=1,
         # log scale for error
         norm=colors.LogNorm(min_err, max_err),
         vmin=min_err,
@@ -159,42 +159,6 @@ def plot_season_map(summer: pd.DataFrame, winter: pd.DataFrame):
     cbar_ax = fig.add_axes([0.85, 0.15, 0.02, 0.7])
     fig.colorbar(sc2, cax=cbar_ax)
     plt.savefig('avk_winter_summer.pdf')
-
-
-# %%
-winter = import_data('data/motiv/error-estimation/METOPA_20160201*.csv',
-                     gas='WV',
-                     var='avk',
-                     inlcude_coordinates=True,
-                     loi=-19,
-                     threshold=0.001,
-                     type=1)
-summer = import_data('data/motiv/error-estimation/METOP*_20160801*.csv',
-                     gas='WV',
-                     var='avk',
-                     inlcude_coordinates=True,
-                     loi=-19,
-                     threshold=0.001,
-                     type=1)
-# %%
-
-
-def import_size(path_pattern: str):
-    frames = []
-    for file in glob.glob(path_pattern):
-        # frame = pd.read_csv(file, index_col=None, header=0)
-        frame = pd.read_csv(file)
-        if 'size' in frame:
-            frame['size'] = frame['size'] / 1000
-        datestring = file.split('_')[1]
-        date = datetime.strptime(datestring[:8], '%Y%m%d')
-        frame['date'] = date.date()
-        frames.append(frame)
-    return pd.concat(frames, axis=0, ignore_index=True)
-
-
-size = import_size('data/motiv/compression-summary/METOP*.csv')
-# %%
 
 
 def plot_size_season(df: pd.DataFrame, gas: str, var: str):
@@ -216,85 +180,110 @@ def plot_size_season(df: pd.DataFrame, gas: str, var: str):
         group_mean = group.mean()['size']
         ax.axhline(group_mean, color=colors[index], linestyle='--')
     ax.invert_xaxis()
-    ax.set_ylabel('Mean size per orbit in MB')
-    ax.set_xlabel('Threshold for eigenvalue selection')
+    ax.set_ylabel('mean orbit size [MB]')
+    ax.set_xlabel('threshold eigenvalue selection')
     plt.xticks(np.arange(4), map(lambda t: f'{t:.0e}', thresholds))
     plt.title(f'Data size reduction for {gas} {var}')
     plt.show()
 
-plot_size_season(size, 'WV', 'avk')
-
-# %%
-# plot_season_map(summer, winter)
-# %%
-size = import_data(
-    'data/motiv/compression-summary/METOP*_2016*.csv')
-
-# %% [markdown]
-# Season: Winter
-
-# %%
-
-
-def filter_by(df: pd.DataFrame, gas: str, var: str, level_of_interest: int, rc_error=True):
-    return df[(df['rc_error'] == rc_error) & (df['gas'] == gas) & (df['var'] == var) & (df['level_of_interest'] == level_of_interest)]
-
 
 def plot_levels(df: pd.DataFrame, gas: str, var: str, type, season=None):
-    ax = df[
+    df = df[
         (df['gas'] == gas) &
         (df['var'] == var) &
         (df['type'] == type)
-    ].groupby(['threshold', 'altitude']).mean()['err'].unstack().plot.bar(logy=True, rot=0, figsize=(4, 4))
+    ]
+
+    # plot reconstruction error
+    original = df[df['threshold'] == 1]
+    compressed = df[~df.isin(original).all(1)]
+    groups = compressed.groupby(['threshold', 'altitude']).mean()['err']
+    print(groups)
+    ax = groups.unstack().plot.bar(logy=True, rot=0, figsize=(4, 4))
     ax.invert_xaxis()
-    plt.xticks(np.arange(5), map(lambda t: f'{t:.0e}', thresholds))
+
+    # plot original error
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for index, (name, group) in enumerate(original.groupby(['altitude'])):
+        group_mean = group.mean()['err']
+        ax.axhline(group_mean, color=colors[index], linestyle='--')
+
+    plt.xticks(np.arange(4), map(lambda t: f'{t:.0e}', thresholds))
     # plt.title(f'Error estimation for {gas} {var} type {type}')
-    ax.set_xlabel('Threshold for eigenvalue selection')
+    ax.set_xlabel('threshold for eigenvalue selection')
+    ax.set_ylabel('error variance [log(ppmv)^2]')
     plt.savefig(f'err_{gas}_{var}_type{type}.pdf')
     plt.show()
 
 
 def plot_types(df: pd.DataFrame, gas: str, var: str, level_of_interest: int):
-    ax = df[
+    df = df[
         (df['gas'] == gas) &
         (df['var'] == var) &
         (df['level_of_interest'] == level_of_interest)
-    ].groupby(['threshold', 'type']).mean()['err'].unstack().plot.bar(logy=True, rot=0, figsize=(4, 4))
+    ]
+    original = df[df['rc_error'] == False]
+    compressed = df[~df.isin(original).all(1)]
+
+    ax = compressed.groupby(['threshold', 'type']).mean()[
+        'err'].unstack().plot.bar(logy=True, rot=0, figsize=(4, 4))
     # plt.title(
     #     f'Error estimation {gas} {var} with level of interest {level_of_interest}')
     ax.invert_xaxis()
-    ax.set_xlabel('Threshold for eigenvalue selection')
-    plt.xticks(np.arange(5), map(lambda t: f'{t:.0e}', thresholds))
+    ax.set_xlabel('threshold eigenvalue selection')
+    ax.set_ylabel('error variance [log(ppmv)^2]')
+
+    # plot original error
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for index, (name, group) in enumerate(original.groupby(['type'])):
+        group_mean = group.mean()['err']
+        ax.axhline(group_mean, color=colors[index], linestyle='--')
+
+    plt.xticks(np.arange(4), map(lambda t: f'{t:.0e}', thresholds))
     plt.savefig(f'err_{gas}_{var}_loi{level_of_interest}.pdf')
     plt.show()
 
 
-def plot_size_for(df: pd.DataFrame, gas: str, var: str):
-    original = df[
-        (df['ancestor'] == 'MoveVariables') &
-        (df['gas'] == gas) &
-        (df['variable'] == var)
-    ]
-    compressed = df[
-        (df['ancestor'] == 'CompressDataset') &
-        (df['gas'] == gas) &
-        (df['variable'] == var)
-    ]
-    ax = compressed.groupby(['threshold']).mean()[
-        'size'].plot.bar(rot=0, legend=False, figsize=(4, 4))
-    original_mean = original['size'].mean()
-    ax.axhline(original_mean, color='red')
-    ax.invert_xaxis()
-    ax.text(2.8, original_mean * 0.92, 'Mean original size',
-            horizontalalignment='center')
-    ax.set_ylabel('Mean size in MB')
-    ax.set_xlabel('Threshold for eigenvalue selection')
-    plt.xticks(np.arange(4), map(lambda t: f'{t:.0e}', thresholds))
-    plt.title(f'Data size reduction for {gas} {var}')
-    plt.show()
+# %% [markdown]
 
+# ## Example: Water Vapour Averaging Kernel
+# plot size
+size = import_size('data/final/size/METOP*.csv')
+plot_size_season(size, 'WV', 'avk')
 
 # %%
+err = import_data('data/final/WV/avk/METOPB_20160801115357_20086_20190312071833.nc',
+                  inlcude_coordinates=True)
+plot_levels(err, 'WV', 'avk', type=1)
+
+# %%
+plot_types(err, 'WV', 'avk', -19)
+
+# %%
+# error map
+err_winter = import_data('data/final/WV/avk/METOPA_20160201*.nc',
+                         gas='WV',
+                         var='avk',
+                         inlcude_coordinates=True,
+                         loi=-19,
+                         threshold=0.001,
+                         type=1)
+err_summer = import_data('data/final/WV/avk/METOP*_20160801*.nc',
+                         gas='WV',
+                         var='avk',
+                         inlcude_coordinates=True,
+                         loi=-19,
+                         threshold=0.001,
+                         type=1)
+
+# %%
+plot_error_map(err_winter, 'WV', 'avk')
+
+# %%
+plot_season_map(err_summer, err_winter)
+
+# %%
+# Batch processing: define all plot needed
 plots = [
     # WV avk
     {'method': plot_levels, 'gas': 'WV', 'var': 'avk', 'type': 1},
@@ -329,94 +318,9 @@ plots = [
 
 for plot in plots:
     print('plotting', plot)
-    df = import_data('data/motiv/error-estimation/*.csv',
+    df = import_data('data/motiv/error-estimation/METOPA_20160201001156_48180_20190323165817.csv',
                      gas=plot['gas'],
                      var=plot['var'])
     method = plot.pop('method')
     method(df, **plot)
     del df
-
-
-# %%[markdown]
-# # Water Vapour
-#
-# ### Averaging Kernel
-plot_size_for(size, 'WV', 'avk')
-# %%
-plot_levels(err_winter, 'WV', 'avk', 1)
-# %%
-plot_levels(err_summer, 'WV', 'avk', 2)
-# %%
-plot_types(err_winter, 'WV', 'avk', -19)
-# %%
-plot_types(err_summer, 'WV', 'avk', -16)
-
-# %%[markdown]
-# ## Noise Matrix
-plot_size_for(size, 'WV', 'n')
-# %%
-plot_levels(err_winter, 'WV', 'n', 1)
-# %%
-plot_levels(err_summer, 'WV', 'n', 2)
-# %%
-plot_types(err_winter, 'WV', 'n', -19)
-# %%
-plot_types(err_summer, 'WV', 'n', -16)
-
-# %%[markdown]
-# ## Cross averaging kernels with atmospheric temperature
-plot_size_for(size, 'WV', 'Tatmxavk')
-# %% [markdown]
-plot_levels(err_summer, 'WV', 'Tatmxavk', 1)
-# %% [markdown]
-plot_levels(err_summer, 'WV', 'Tatmxavk', 2)
-# %%
-plot_types(err_winter, 'WV', 'Tatmxavk', -19)
-# %%
-plot_types(err_summer, 'WV', 'Tatmxavk', -16)
-
-# %% [markdown]
-# # Greenhouse gases
-# ## Averaging kernel
-plot_size_for(size, 'GHG', 'avk')
-
-# %%
-plot_levels(err_winter, 'GHG_CH4', 'avk', 1)
-
-# %% [markdown]
-# ## Noise matrix
-plot_size_for(size, 'GHG', 'n')
-
-# %%
-plot_levels(err_summer, 'GHG_CH4', 'n', 1, season='summer')
-# %% [markdown]
-# ## Cross averaging kernel
-plot_size_for(size, 'GHG', 'Tatmxavk')
-# %%
-plot_levels(err_summer, 'GHG_CH4', 'Tatmxavk', 1, season='summer')
-
-# %% [markdown]
-# # Nitrid Acid
-
-plot_size_for(size, 'HNO3', 'avk')
-# %%
-plot_levels(err_summer, 'HNO3', 'avk', type=1, season='summer')
-# %%
-plot_size_for(size, 'HNO3', 'Tatmxavk')
-# %%
-plot_levels(err_summer, 'HNO3', 'Tatmxavk', type=1, season='summer')
-# %%
-plot_size_for(size, 'HNO3', 'n')
-# %%
-plot_levels(err_summer, 'HNO3', 'n', type=1, season='summer')
-
-# %% [markdown]
-# # Atmospheric Temperature
-# %%
-plot_size_for(size, 'Tatm', 'avk')
-# %%
-plot_levels(err_summer, 'Tatm', 'avk', type=1, season='summer')
-# %%
-plot_size_for(size, 'Tatm', 'n')
-# %%
-plot_levels(err_summer, 'Tatm', 'n',  type=1, season='summer')
