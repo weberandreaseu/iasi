@@ -114,13 +114,13 @@ def plot_error_map(df, gas=None, var=None, season=None):
         marker='.',
         s=2,
         # log scale for error
-        norm=colors.LogNorm(df.err.min(), df.err.max()),
+        # norm=colors.LogNorm(df.err.min(), df.err.max()),
         transform=ccrs.PlateCarree())
     plt.colorbar(sc)
     ax.coastlines()
     if season:
         plt.savefig(f'map_{gas}_{var}_{season}.pdf')
-    plt.close()
+    plt.show()
 
 
 def plot_season_map(summer: pd.DataFrame, winter: pd.DataFrame):
@@ -269,27 +269,8 @@ def plot_types(df: pd.DataFrame, gas: str, var: str, level_of_interest: int):
 # %%
 # plot_types(err, 'WV', 'avk', -19)
 
-# %%
-# error map
-err_winter = import_data('data/final/WV/avk/METOP?_20160201*.nc',
-                         gas='WV',
-                         var='avk',
-                         inlcude_coordinates=True,
-                         loi=-19,
-                         threshold=0.001,
-                         type=1)
-err_summer = import_data('data/final/WV/avk/METOP?_20160801*.nc',
-                         gas='WV',
-                         var='avk',
-                         inlcude_coordinates=True,
-                         loi=-19,
-                         threshold=0.001,
-                         type=1)
 
-# %%
-# plot_error_map(err_winter, 'WV', 'avk')
-
-# %%
+# %%close()
 plot_season_map(err_summer, err_winter)
 
 # %%
@@ -426,5 +407,45 @@ rank_winter = import_eigenvalues(
     'data/eigenvalues/METOP?_201602*.nc', 'state/WV/avk/k')
 
 
-#%%
+# %%
 plot_rank_map(rank_summer, rank_winter)
+
+# %%
+err = import_data('data/final/WV/avk/*.nc',
+                  gas='WV',
+                  var='avk',
+                  inlcude_coordinates=True,
+                  loi=-19,
+                  type=1)
+
+err_rc = err[err['threshold'] == 0.001]
+err_org = err[err['rc_error'] == False]
+assert err_org.shape == err_rc.shape
+
+# %%
+plt.scatter(err_rc.err, err_org.err)
+plt.ylim(err_org.err.min(), err_org.err.max())
+plt.xlim(err_rc.err.min(), err_rc.err.max())
+# %%
+
+
+def get_outlier(df):
+    return df[(df.err-df.err.mean()).abs() > 3*df.err.std()]
+
+
+outlier_rc = get_outlier(err_rc)
+plot_error_map(outlier_rc)
+
+outlier_org = get_outlier(err_org)
+plot_error_map(outlier_org)
+
+# %%
+min, max = err_rc.err.min(),  err_rc.err.max()
+fig = plt.figure(figsize=(6, 4))
+plt.hist(err_rc.err, bins=np.logspace(np.log10(min), np.log10(max), num=60))
+plt.gca().set_xscale("log")
+plt.savefig('wv_avk_rc_err_dist.pdf', bbox_inches='tight')
+# plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0)) 
+plt.ylabel('# measurements')
+plt.xlabel('error variance [log(ppmv)^2]')
+plt.show()
