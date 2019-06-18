@@ -158,7 +158,7 @@ def plot_season_map(summer: pd.DataFrame, winter: pd.DataFrame):
     fig.subplots_adjust(right=0.82)
     cbar_ax = fig.add_axes([0.85, 0.15, 0.02, 0.7])
     fig.colorbar(sc2, cax=cbar_ax)
-    plt.savefig('avk_winter_summer.pdf')
+    plt.savefig('avk_winter_summer.pdf', bbox_inches='tight')
 
 
 def plot_size_season(df: pd.DataFrame, gas: str, var: str):
@@ -271,26 +271,26 @@ def plot_types(df: pd.DataFrame, gas: str, var: str, level_of_interest: int):
 
 # %%
 # error map
-# err_winter = import_data('data/final/WV/avk/METOPA_20160201*.nc',
-#                          gas='WV',
-#                          var='avk',
-#                          inlcude_coordinates=True,
-#                          loi=-19,
-#                          threshold=0.001,
-#                          type=1)
-# err_summer = import_data('data/final/WV/avk/METOP*_20160801*.nc',
-#                          gas='WV',
-#                          var='avk',
-#                          inlcude_coordinates=True,
-#                          loi=-19,
-#                          threshold=0.001,
-#                          type=1)
+err_winter = import_data('data/final/WV/avk/METOP?_20160201*.nc',
+                         gas='WV',
+                         var='avk',
+                         inlcude_coordinates=True,
+                         loi=-19,
+                         threshold=0.001,
+                         type=1)
+err_summer = import_data('data/final/WV/avk/METOP?_20160801*.nc',
+                         gas='WV',
+                         var='avk',
+                         inlcude_coordinates=True,
+                         loi=-19,
+                         threshold=0.001,
+                         type=1)
 
 # %%
 # plot_error_map(err_winter, 'WV', 'avk')
 
 # %%
-# plot_season_map(err_summer, err_winter)
+plot_season_map(err_summer, err_winter)
 
 # %%
 # Batch processing: define all plot needed
@@ -362,3 +362,69 @@ variables = {
 
 for gas, var in variables:
     plot_size_season(size, gas, var)
+
+
+# %%
+def import_eigenvalues(pattern, var) -> pd.DataFrame:
+    frames = []
+    for file in glob.glob(pattern):
+        nc = Dataset(file)
+        k = nc['/state/WV/avk/k'][...]
+        lat = nc['lat'][...]
+        lon = nc['lon'][...]
+        nc.close()
+        frame = pd.DataFrame({'lat': lat, 'lon': lon, 'k': k})
+        frame = frame[frame['k'].between(0, 58)]
+        frames.append(frame)
+    return pd.concat(frames, axis=0, ignore_index=True)
+
+
+# %%
+def plot_rank_map(summer: pd.DataFrame, winter: pd.DataFrame):
+    min_err = min(summer['k'].min(), winter['k'].min())
+    max_err = max(summer['k'].max(), winter['k'].max())
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1, figsize=(6, 6), subplot_kw={'projection': ccrs.PlateCarree()})
+    sc1 = ax1.scatter(
+        summer.lon,
+        summer.lat,
+        c=summer['k'],
+        marker='.',
+        s=1,
+        # log scale for error
+        # norm=colors.LogNorm(min_err, max_err),
+        vmin=min_err,
+        vmax=max_err,
+        transform=ccrs.PlateCarree())
+    # plt.colorbar(sc1)
+    ax1.coastlines()
+    ax1.set_title('2016-08-01')
+    sc2 = ax2.scatter(
+        winter.lon,
+        winter.lat,
+        c=winter['k'],
+        marker='.',
+        s=1,
+        # log scale for error
+        # norm=colors.LogNorm(min_err, max_err),
+        vmin=min_err,
+        vmax=max_err,
+        transform=ccrs.PlateCarree())
+    ax2.coastlines()
+    ax2.set_title('2016-02-01')
+    fig.subplots_adjust(right=0.82)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.02, 0.7])
+    fig.colorbar(sc2, cax=cbar_ax)
+    plt.savefig('rank_winter_summer.pdf', bbox_inches='tight')
+
+
+# %%
+
+rank_summer = import_eigenvalues(
+    'data/eigenvalues/METOP?_201608*.nc', 'state/WV/avk/k')
+rank_winter = import_eigenvalues(
+    'data/eigenvalues/METOP?_201602*.nc', 'state/WV/avk/k')
+
+
+#%%
+plot_rank_map(rank_summer, rank_winter)
