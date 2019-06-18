@@ -43,7 +43,8 @@ def import_data(path_pattern: str,
                 threshold: float = None,
                 loi: int = None,
                 type: int = None,
-                inlcude_coordinates=False) -> pd.DataFrame:
+                inlcude_coordinates=False,
+                rank: str = None) -> pd.DataFrame:
     frames = []
     for file in glob.glob(path_pattern):
         frame = pd.read_csv(file, index_col=None, header=0)
@@ -78,8 +79,13 @@ def import_data(path_pattern: str,
             nc = Dataset(f'data/eigenvalues/{orbit}.nc')
             lat = nc['lat'][...]
             lon = nc['lon'][...]
-            coordinates = np.block([[lat], [lon]])
-            coordinates = pd.DataFrame(coordinates.T, columns=['lat', 'lon'])
+            if rank:
+                target_rank = nc[rank][...]
+                coordinates = pd.DataFrame(
+                    {'lat': lat, 'lon': lon, 'rank': target_rank})
+            else:
+                coordinates = pd.DataFrame(
+                    {'lat': lat, 'lon': lon, 'rank': rank})
             frame = frame.merge(coordinates, left_on='event', right_index=True)
         frames.append(frame)
 
@@ -441,11 +447,42 @@ plot_error_map(outlier_org)
 
 # %%
 min, max = err_rc.err.min(),  err_rc.err.max()
-fig = plt.figure(figsize=(6, 4))
-plt.hist(err_rc.err, bins=np.logspace(np.log10(min), np.log10(max), num=60))
-plt.gca().set_xscale("log")
+fig = plt.figure(figsize=(4, 4))
+plt.hist(err_rc.err, bins=np.logspace(np.log10(min), np.log10(max), num=60), orientation='horizontal')
+plt.gca().set_yscale("log")
 plt.savefig('wv_avk_rc_err_dist.pdf', bbox_inches='tight')
-# plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0)) 
-plt.ylabel('# measurements')
-plt.xlabel('error variance [log(ppmv)^2]')
+# plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+plt.ylabel('rc error variance [log(ppmv)^2]')
+plt.xlabel('# measurements')
+plt.savefig('wv_avk_rc_err_dist.pdf', bbox_inches='tight')
 plt.show()
+
+
+# %%
+err = import_data('data/final/WV/avk/*.nc',
+                  rank='state/WV/avk/k',
+                  gas='WV',
+                  var='avk',
+                  inlcude_coordinates=True,
+                  loi=-19,
+                  type=1)
+err_rc = err[err['threshold'] == 0.001]
+
+# %%
+groups = err_rc.groupby(['rank'])['err']
+means = groups.mean()
+errors = groups.std()
+
+fig, ax = plt.subplots()
+means.plot.bar(yerr=([0] * 15, errors.tolist()), ax=ax, capsize=4)
+
+# %%
+# err_rc = err[err['threshold'] == 0.001]
+ax = err_rc.boxplot(column=['err'], by='rank', figsize=(6, 4))
+fig = ax.get_figure()
+fig.suptitle(None)
+plt.title(None)
+plt.ylabel('rc error variance [log(ppmv)^2]')
+plt.xlabel('target rank')
+plt.yscale('log')
+plt.savefig('err_box_by_rank_wv_avk.pdf', bbox_inches='tight')
