@@ -43,14 +43,16 @@ class GeographicArea:
                     var = nc[feature][...]
                     assert not var.mask.any()
                     frame[feature] = var.data
-            # filter to given area
-            frame = frame[(frame.lon.between(*self.lon)) &
-                          (frame.lat.between(self.lat[1], self.lat[0]))]
+            frame = self.filter(frame)
             frames.append(frame)
         return pd.concat(frames, ignore_index=True)
 
     def get_extend(self) -> List:
         return [*self.lon, *self.lat]
+
+    def filter(self, df: pd.DataFrame) -> pd.DataFrame:
+        return df[(df.lon.between(*self.lon)) &
+                  (df.lat.between(self.lat[1], self.lat[0]))]
 
     def scatter(self, *args, **kwargs):
         ax = plt.axes(projection=ccrs.PlateCarree())
@@ -97,7 +99,7 @@ class SpatialWaterVapourScaler(BaseEstimator, TransformerMixin):
 
 # %%
 area = GeographicArea(lat=(50, -25), lon=(-45, 60))
-df = area.import_dataset('data/input/METOPAB_20160625_global_evening.nc')
+df = area.import_dataset('data/input/METOPAB_20160101_global_evening.nc')
 scaler = SpatialWaterVapourScaler(km=120, H2O=0.2, delD=5)
 scaled = pd.DataFrame(scaler.transform(df.values), columns=features)
 clustering = DBSCAN(eps=1.5, min_samples=10)
@@ -166,5 +168,5 @@ plt.show()
 # %%
 area.scatter(samples.lon, samples.lat, alpha=0.65,
              marker='.', s=8, c=samples['label'], cmap='nipy_spectral')
-plt.savefig('cluster.pdf')
+# plt.savefig('cluster.pdf')
 plt.show()
