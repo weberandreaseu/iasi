@@ -29,14 +29,15 @@ class SpatialWaterVapourScaler(BaseEstimator, TransformerMixin):
         - delD
         """
         assert X.shape[1] == 4
+        X_ = np.ndarray(X.shape)
+        # lat
+        X_[:, 0] = (X[:, 0] * latitude_km) / self.km
         # cos takes radians => pi radians are 180 degrees
         # lon = lon * latitude_km * cos(lat * (pi / 180))
-        X[:, 1] = (X[:, 1] * latitude_km *
+        X_[:, 1] = (X[:, 1] * latitude_km *
                    np.cos(X[:, 0] * (pi / 180))) / self.km
-        # lat
-        X[:, 0] = (X[:, 0] * latitude_km) / self.km
         # H2O
-        X[:, 2] = np.log(X[:, 2]) / self.H2O
+        X_[:, 2] = np.log(X[:, 2]) / self.H2O
         # delD
-        X[:, 3] = X[:, 3] / self.delD
-        return X
+        X_[:, 3] = X[:, 3] / self.delD
+        return X_

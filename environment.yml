@@ -16,3 +16,4 @@ dependencies:
   - python-dateutil=2.7.5
   - cartopy=0.17
   - seaborn=0.9.0
+  - hdbscan=0.8.22
