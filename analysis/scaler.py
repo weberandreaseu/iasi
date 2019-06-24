@@ -29,7 +29,6 @@ class SpatialWaterVapourScaler(BaseEstimator, TransformerMixin):
         - delD
         """
         assert X.shape[1] == 4
-        # lon
         # cos takes radians => pi radians are 180 degrees
         # lon = lon * latitude_km * cos(lat * (pi / 180))
         X[:, 1] = (X[:, 1] * latitude_km *
