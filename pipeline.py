@@ -1,3 +1,4 @@
+# %%
 """
 Example of running a clustering pipeline with spatio-temporal data
 """
@@ -17,22 +18,23 @@ from analysis.sink import NetCDFSink
 from hdbscan import HDBSCAN
 import time
 
+import matplotlib.pyplot as plt
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 logger = logging.getLogger(__name__)
 
-file_pattern = 'test/resources/METOPAB_20160101_global_evening_1000.nc'
-# file_pattern = 'data/input/METOPAB_20160101_global_evening.nc'
+# file_pattern = 'test/resources/METOPAB_20160101_global_evening_1000.nc'
+file_pattern = 'data/input/METOPAB_20160801_global_evening.nc'
 area = GeographicArea(lat=(50, -25), lon=(-45, 60))
 df = area.import_dataset(file_pattern)
 X = df[features].values
 
 # create estimators
 scaler = SpatialWaterVapourScaler()
-# cluster = DBSCAN()
-cluster = HDBSCAN()
+cluster = DBSCAN(eps=3, min_samples=5)
+# cluster = HDBSCAN()
 
 # create pipeline
 pipeline = Pipeline([
@@ -42,12 +44,14 @@ pipeline = Pipeline([
 
 # create parameter grid
 param_grid = list(ParameterGrid({
-    'scaler__km': [50, 60, 70],
-    'scaler__H2O': [0.08, 0.1, 0.12],
-    'scaler__delD': [8, 10, 12],
-    'cluster__min_cluster_size': [8, 10],
-    # 'cluster__eps': [10, 15, 20],
+    'scaler__km': [40],
+    'scaler__H2O': [0.1],
+    'scaler__delD': [10],
+    # 'cluster__min_cluster_size': [4, 5, 8],
+    'cluster__eps': [3],
+    # 'cluster__eps': [3, 5, 7],
     # 'cluster__min_samples': [5, 10, 15]
+    'cluster__min_samples': [5]
 }))
 
 metrics = {
@@ -62,7 +66,7 @@ def statistics(y):
     total = len(y)
     cluster, counts = np.unique(y[y > -1], return_counts=True)
     noise = len(y[y == -1])
-    return total, len(cluster), counts.std(), noise
+    return total, len(cluster), counts.mean(), counts.std(), noise
 
 
 results = pd.DataFrame(data=param_grid)
@@ -73,9 +77,24 @@ for i, params in enumerate(param_grid):
     X_ = scaler.fit_transform(X)
     y = pipeline.fit_predict(X)
     stat = list(statistics(y))
-    score = [scorer(X_, y) for scorer in metrics.values()]
-    scores.append(score + list(statistics(y)))
+    area.scatter(df['lon'], df['lat'], alpha=1, s=8, c=y)
+    plt.show()
+    plt.scatter(np.log(X[:, 2]), X[:, 3], alpha=0.15, s=8, c=y)
+    plt.show()
+    param_score = []
+    for scorer in metrics.values():
+        try:
+            score = scorer(X_, y)
+        except ValueError as err:
+            score = np.nan
+        param_score.append(score)
+    # score = [ for scorer in metrics.values()]
+    scores.append(param_score + list(statistics(y)))
 
 scores = pd.DataFrame(data=scores, columns=list(metrics.keys()) +
-                      ['total', 'cluster', 'cluster_std','noise'])
+                      ['total', 'cluster', 'cluster_mean', 'cluster_std', 'noise'])
 results = pd.concat([results, scores], axis=1)
+
+
+# %%
+area.compare_plot(X, y)
