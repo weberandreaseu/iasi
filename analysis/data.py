@@ -14,17 +14,19 @@ Coordinate = Tuple[float, float]
 CoordinateRange = Tuple[float, float]
 
 features = ['lat', 'lon', 'H2O', 'delD']
+flags = ['flag_srf', 'flag_cld',
+         'flag_qual']
 
 
 class GeographicArea:
     """Provides methods to import and plot data of a given area"""
 
-    def __init__(self, lat: CoordinateRange = (90, -90), lon: CoordinateRange = (90, -90), level=6):
+    def __init__(self, lat: CoordinateRange = (90, -90), lon: CoordinateRange = (90, -90), level=4):
         """Extend of area in lat lon. Per default all coordinate are included
 
         :param lat  : Tupel(north, south)
         :param lon  : Tupel(west, east)
-        :param level: atmospheric level (0..8)
+        :param level: atmospheric level (0..8). 4 = 4.2 km
         """
         self.lat = lat
         self.lon = lon
@@ -46,16 +48,33 @@ class GeographicArea:
                     var = nc[feature][:, self.level]
                     assert not var.mask.any()
                     frame[feature] = var.data
-            frame = self.filter(frame)
+                for flag in flags:
+                    flag_data = nc['/FLAGS/' + flag][...]
+                    frame[flag] = flag_data.data
+                for flag in ['flag_vres', 'flag_resp']:
+                    flag_data = nc['/FLAGS/' + flag][:, self.level]
+                    frame[flag] = flag_data.data
+            frame = self.filter_location(frame)
+            frame = self.filter_flags(frame)
             frames.append(frame)
-        return pd.concat(frames, ignore_index=True)
+        return pd.concat(frames, ignore_index=True)[features]
 
-    def filter(self, df: pd.DataFrame) -> pd.DataFrame:
+    def filter_location(self, df: pd.DataFrame) -> pd.DataFrame:
         return df[(df.lon.between(*self.lon)) &
                   (df.lat.between(self.lat[1], self.lat[0]))]
+
+    def filter_flags(self, df: pd.DataFrame) -> pd.DataFrame:
+        return df[
+            (df['flag_srf'].isin([1, 2, 5])) &
+            (df['flag_cld'].isin([1, 2])) &
+            (df['flag_qual'] == 2) &
+            (df['flag_vres'] == 2) &
+            (df['flag_resp'] == 2)
+        ]
 
     def scatter(self, *args, **kwargs):
         ax = plt.axes(projection=ccrs.PlateCarree())
         ax.set_extent([*self.lon, *self.lat], crs=ccrs.PlateCarree())
         ax.coastlines()
         ax.scatter(*args, **kwargs)
+        return ax
