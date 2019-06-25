@@ -13,7 +13,7 @@ class TestData(unittest.TestCase):
     def test_import(self):
         area = GeographicArea(lat=(50, -25), lon=(-45, 60))
         df = area.import_dataset(file)
-        self.assertEqual(df.shape, (956, 4))
+        self.assertEqual(df.shape, (541, 4))
         # test filtering
         self.assertGreaterEqual(df.lat.min(), -25)
         self.assertLessEqual(df.lat.max(), 50)
