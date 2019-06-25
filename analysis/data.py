@@ -26,7 +26,7 @@ class GeographicArea:
     def __init__(self, lat: CoordinateRange = (90, -90), lon: CoordinateRange = (90, -90), level=4):
         """Extend of area in lat lon. Per default all coordinate are included
 
-        :param lat  : Tupel(north, south)
+        :param lat  : Tupel(south, north)
         :param lon  : Tupel(west, east)
         :param level: atmospheric level (0..8). 4 = 4.2 km
         """
@@ -63,7 +63,7 @@ class GeographicArea:
 
     def filter_location(self, df: pd.DataFrame) -> pd.DataFrame:
         return df[(df.lon.between(*self.lon)) &
-                  (df.lat.between(self.lat[1], self.lat[0]))]
+                  (df.lat.between(*self.lat))]
 
     def filter_flags(self, df: pd.DataFrame) -> pd.DataFrame:
         return df[
@@ -76,42 +76,85 @@ class GeographicArea:
 
     def scatter(self, *args, **kwargs):
         ax = plt.axes(projection=ccrs.PlateCarree())
-        ax.set_extent([*self.lon, *self.lat], crs=ccrs.PlateCarree())
+        ax.set_extent(self._get_extend(), crs=ccrs.PlateCarree())
         ax.coastlines()
         ax.scatter(*args, **kwargs)
         return ax
 
-    def compare_plot(self, X, y, include_noise=True, n_samples=None):
+    def _get_extend(self):
+        return [*self.lon, self.lat[1], self.lat[0]]
+
+    def cluster_subsample(self, df: pd.DataFrame, n_samples: int) -> pd.DataFrame:
+        sample_frames = []
+        cluster = df.groupby(['label']).groups
+        for cluster_indices in sample(list(cluster.values()), n_samples):
+            sample_frames.append(df.iloc[cluster_indices])
+        return pd.concat(sample_frames)
+
+    def cluster_subarea(self, df: pd.DataFrame):
+        # calc mean of each cluster
+        groups = df.groupby(['label'])['lat', 'lon'].mean()
+        # filteder cluser with centroid within coordinate range
+        groups = self.filter_location(groups)
+        groups['area'] = True
+        df = df.merge(groups['area'], left_on='label',
+                      right_index=True, how='outer')
+        df['area'].fillna(False, inplace=True)
+        return df[df['area'] == True]
+
+    def _rectangle(self, **kwargs) -> patches.Rectangle:
+        origin = (self.lon[0], self.lat[0])
+        width = self.lon[1] - self.lon[0]
+        height = self.lat[1] - self.lat[0]
+        return patches.Rectangle(
+            origin, width, height, **kwargs
+        )
+
+    def compare_plot(self, X, y,
+                     include_noise=True,
+                     n_samples=None,
+                     subarea=None):
         df = pd.DataFrame(X, columns=features)
         df['label'] = y
         noise = df[df['label'] == -1]
         no_noise = df[df['label'] > -1]
-        cmap = 'tab20c'  # discrete_cmap(len(np.unique(y)))
-        if n_samples:
-            sample_frames = []
-            cluster = no_noise.groupby(['label']).groups
-            for cluster_indices in sample(list(cluster.values()), n_samples):
-                sample_frames.append(df.iloc[cluster_indices])
-            no_noise = pd.concat(sample_frames)
 
         # H2O/delD
         ax1 = plt.subplot(211)
-        ax1.scatter(np.log(no_noise['H2O']), no_noise['delD'],
-                    alpha=1, s=8, c=no_noise['label'], cmap=cmap)
+
         # geo
         ax2 = plt.subplot(212, projection=ccrs.PlateCarree())
-        ax2.set_extent([*self.lon, *self.lat], crs=ccrs.PlateCarree())
+        ax2.set_extent(self._get_extend(), crs=ccrs.PlateCarree())
         ax2.coastlines()
-        ax2.scatter(no_noise['lon'], no_noise['lat'],  alpha=1,
-                    s=8, c=no_noise['label'], cmap=cmap)
+
+        if n_samples:
+            samples = self.cluster_subsample(no_noise, n_samples)
+            self.water_scatter(ax1, samples)
+            self.geo_scatter(ax2, samples)
+
         if include_noise and len(noise) > 0:
-            ax1.scatter(np.log(noise['H2O']), noise['delD'],
-                        alpha=0.2, s=8, c='gray')
-            ax2.scatter(noise['lon'], noise['lat'],  alpha=0.2, s=8, c='gray')
+            self.geo_scatter(ax2, noise, c='yellow', alpha=0.3)
 
         # add box
-        rect = patches.Rectangle(
-            (23, -24), 25, 25, linewidth=1, edgecolor='r', facecolor='none')
-        ax2.add_patch(rect)
-
+        if subarea:
+            ax2.add_patch(subarea._rectangle(linewidth=1, edgecolor='r', facecolor='none'))
+            cluster_area = subarea.cluster_subarea(no_noise)
+            outside_area = no_noise[~no_noise.index.isin(cluster_area.index)]
+            self.water_scatter(ax1, cluster_area)
+            self.geo_scatter(ax2, cluster_area)
+            self.geo_scatter(ax2, outside_area)
+            # plot only noise in subarea
+            noise_area = subarea.filter_location(noise)
+            if include_noise and len(noise_area) > 0:
+                self.water_scatter(ax1, noise_area, c='yellow', alpha=0.3)
         plt.show()
+
+    def geo_scatter(self, ax, df: pd.DataFrame, alpha=0.8, s=8, **kwargs):
+        cmap = kwargs.pop('cmap', 'tab20c')
+        c = kwargs.pop('c', df['label'])
+        ax.scatter(df['lon'], df['lat'], c=c, cmap=cmap, alpha=alpha, s=s, **kwargs)
+
+    def water_scatter(self, ax, df: pd.DataFrame, alpha=1, s=8, **kwargs):
+        cmap = kwargs.pop('cmap', 'tab20c')
+        c = kwargs.pop('c', df['label'])
+        ax.scatter(np.log(df['H2O']), df['delD'], c=c, cmap=cmap,  alpha=alpha, s=s, **kwargs)

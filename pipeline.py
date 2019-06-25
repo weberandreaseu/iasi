@@ -2,32 +2,29 @@
 """
 Example of running a clustering pipeline with spatio-temporal data
 """
+import matplotlib.pyplot as plt
+import time
+from hdbscan import HDBSCAN
+from analysis.sink import NetCDFSink
+from analysis.scaler import SpatialWaterVapourScaler
+from cdbw import CDbw
+from analysis.data import GeographicArea, features
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import ParameterGrid
+from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
+from sklearn.cluster import DBSCAN
+import pandas as pd
+import numpy as np
+import logging
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-import logging
-
-import numpy as np
-import pandas as pd
-from sklearn.cluster import DBSCAN
-from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
-from sklearn.model_selection import ParameterGrid
-from sklearn.pipeline import Pipeline
-
-from analysis.data import GeographicArea, features
-from cdbw import CDbw
-from analysis.scaler import SpatialWaterVapourScaler
-from analysis.sink import NetCDFSink
-from hdbscan import HDBSCAN
-import time
-
-import matplotlib.pyplot as plt
 
 
 logger = logging.getLogger(__name__)
 
 # file_pattern = 'test/resources/METOPAB_20160101_global_evening_1000.nc'
 file_pattern = 'data/input/METOPAB_20160801_global_evening.nc'
-area = GeographicArea(lat=(50, -25), lon=(-45, 60))
+area = GeographicArea(lat=(-25, 50), lon=(-45, 60))
 df = area.import_dataset(file_pattern)
 X = df[features].values
 
@@ -96,4 +93,7 @@ scores = pd.DataFrame(data=scores, columns=list(metrics.keys()) +
 results = pd.concat([results, scores], axis=1)
 
 
-area.compare_plot(X, y, n_samples=5)
+subarea = GeographicArea(lat=(-15, 2), lon=(22, 45))
+
+area.compare_plot(X, y, subarea=subarea)
+
