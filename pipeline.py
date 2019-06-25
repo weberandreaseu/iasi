@@ -2,6 +2,8 @@
 """
 Example of running a clustering pipeline with spatio-temporal data
 """
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 import logging
 
 import numpy as np
@@ -20,8 +22,6 @@ import time
 
 import matplotlib.pyplot as plt
 
-import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ X = df[features].values
 
 # create estimators
 scaler = SpatialWaterVapourScaler()
-cluster = DBSCAN(eps=3, min_samples=5)
-# cluster = HDBSCAN()
+# cluster = DBSCAN(eps=3, min_samples=5)
+cluster = HDBSCAN()
 
 # create pipeline
 pipeline = Pipeline([
@@ -44,14 +44,14 @@ pipeline = Pipeline([
 
 # create parameter grid
 param_grid = list(ParameterGrid({
-    'scaler__km': [40],
+    'scaler__km': [60],
     'scaler__H2O': [0.1],
     'scaler__delD': [10],
     # 'cluster__min_cluster_size': [4, 5, 8],
-    'cluster__eps': [3],
+    # 'cluster__eps': [3],
     # 'cluster__eps': [3, 5, 7],
     # 'cluster__min_samples': [5, 10, 15]
-    'cluster__min_samples': [5]
+    'cluster__min_samples': [10]
 }))
 
 metrics = {
@@ -96,5 +96,4 @@ scores = pd.DataFrame(data=scores, columns=list(metrics.keys()) +
 results = pd.concat([results, scores], axis=1)
 
 
-# %%
-area.compare_plot(X, y)
+area.compare_plot(X, y, n_samples=5)

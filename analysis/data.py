@@ -3,9 +3,11 @@ Import spatio-temporal data
 """
 
 import glob
+from random import choice, sample
 from typing import List, Tuple
 
 import cartopy.crs as ccrs
+import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -15,8 +17,7 @@ Coordinate = Tuple[float, float]
 CoordinateRange = Tuple[float, float]
 
 features = ['lat', 'lon', 'H2O', 'delD']
-flags = ['flag_srf', 'flag_cld',
-         'flag_qual']
+flags = ['flag_srf', 'flag_cld', 'flag_qual']
 
 
 class GeographicArea:
@@ -58,7 +59,7 @@ class GeographicArea:
             frame = self.filter_location(frame)
             frame = self.filter_flags(frame)
             frames.append(frame)
-        return pd.concat(frames, ignore_index=True)
+        return pd.concat(frames, ignore_index=True)[features]
 
     def filter_location(self, df: pd.DataFrame) -> pd.DataFrame:
         return df[(df.lon.between(*self.lon)) &
@@ -80,24 +81,37 @@ class GeographicArea:
         ax.scatter(*args, **kwargs)
         return ax
 
-    def compare_plot(self, X, y, include_noise=True, samples=None):
-        no_noise = y > -1
-        noise = y == -1
+    def compare_plot(self, X, y, include_noise=True, n_samples=None):
+        df = pd.DataFrame(X, columns=features)
+        df['label'] = y
+        noise = df[df['label'] == -1]
+        no_noise = df[df['label'] > -1]
+        cmap = 'tab20c'  # discrete_cmap(len(np.unique(y)))
+        if n_samples:
+            sample_frames = []
+            cluster = no_noise.groupby(['label']).groups
+            for cluster_indices in sample(list(cluster.values()), n_samples):
+                sample_frames.append(df.iloc[cluster_indices])
+            no_noise = pd.concat(sample_frames)
 
         # H2O/delD
         ax1 = plt.subplot(211)
-        ax1.scatter(np.log(X[no_noise, 2]), X[no_noise, 3],
-                    alpha=1, s=8, c=y[no_noise], cmap='tab20b')
+        ax1.scatter(np.log(no_noise['H2O']), no_noise['delD'],
+                    alpha=1, s=8, c=no_noise['label'], cmap=cmap)
         # geo
         ax2 = plt.subplot(212, projection=ccrs.PlateCarree())
         ax2.set_extent([*self.lon, *self.lat], crs=ccrs.PlateCarree())
         ax2.coastlines()
-        ax2.scatter(X[no_noise, 1], X[no_noise, 0],  alpha=1,
-                    s=8, c=y[no_noise], cmap='tab20b')
+        ax2.scatter(no_noise['lon'], no_noise['lat'],  alpha=1,
+                    s=8, c=no_noise['label'], cmap=cmap)
+        if include_noise and len(noise) > 0:
+            ax1.scatter(np.log(noise['H2O']), noise['delD'],
+                        alpha=0.2, s=8, c='gray')
+            ax2.scatter(noise['lon'], noise['lat'],  alpha=0.2, s=8, c='gray')
 
-        if include_noise:
-            ax1.scatter(np.log(X[noise, 2]), X[noise, 3],
-                        alpha=0.5, s=8, c='black')
-            ax2.scatter(X[noise, 1], X[noise, 0],  alpha=0.5, s=8, c='black')
+        # add box
+        rect = patches.Rectangle(
+            (23, -24), 25, 25, linewidth=1, edgecolor='r', facecolor='none')
+        ax2.add_patch(rect)
 
         plt.show()
