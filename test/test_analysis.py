@@ -11,7 +11,7 @@ file = 'test/resources/METOPAB_20160101_global_evening_1000.nc'
 class TestData(unittest.TestCase):
 
     def test_import(self):
-        area = GeographicArea(lat=(50, -25), lon=(-45, 60))
+        area = GeographicArea(lat=(-25, 50), lon=(-45, 60))
         df = area.import_dataset(file)
         self.assertEqual(df.shape, (541, 4))
         # test filtering
@@ -39,4 +39,3 @@ class TestScaler(unittest.TestCase):
         self.assertAlmostEqual(X_[1, 1] * scaler.km, -425, places=0)
         # lon
         self.assertAlmostEqual(X_[0, 0] * scaler.km, 40 * 111)
-
