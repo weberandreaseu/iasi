@@ -91,7 +91,8 @@ class GeographicArea:
         cluster = df.groupby(['label']).groups
         for cluster_indices in sample(list(cluster.values()), n_samples):
             sample_frames.append(df.iloc[cluster_indices])
-        return pd.concat(sample_frames)
+        subsamples = pd.concat(sample_frames)
+        return df[df.index.isin(subsamples.index)]
 
     def cluster_subarea(self, df: pd.DataFrame):
         # calc mean of each cluster
@@ -132,29 +133,35 @@ class GeographicArea:
     def compare_plot(self, X, y,
                      include_noise=True,
                      n_samples=None,
-                     subarea=None):
+                     subarea=None,
+                     filename=None):
+        # cosntruct dataframe and filter noise
         df = pd.DataFrame(X, columns=features)
         df['label'] = y
         noise = df[df['label'] == -1]
         no_noise = df[df['label'] > -1]
 
-        # H2O/delD
-        ax1 = plt.subplot(211)
-
-        # geo
-        ax2 = plt.subplot(212, projection=ccrs.PlateCarree())
+        # create axes objects
+        fig = plt.figure(figsize=(10,4))
+        ax1 = plt.subplot(122) # H2O/delD
+        ax1.set_xlabel('H2O [log(ppmv)]')
+        ax1.set_ylabel('delD [‰]')
+        ax2 = plt.subplot(121, projection=ccrs.PlateCarree()) # geo
         ax2.set_extent(self._get_extend(), crs=ccrs.PlateCarree())
         self._set_ticks(ax2)
         ax2.coastlines()
+
+        # plot noise on map
+        if include_noise and len(noise) > 0:
+            self.geo_scatter(ax2, noise, c='yellow', alpha=0.3)
+        
+        # plot only n cluster
         if n_samples:
-            samples = self.cluster_subsample(no_noise, n_samples)
+            samples = self.cluster_subsample(df, n_samples)
             self.water_scatter(ax1, samples)
             self.geo_scatter(ax2, samples)
 
-        if include_noise and len(noise) > 0:
-            self.geo_scatter(ax2, noise, c='yellow', alpha=0.3)
-
-        # add box
+        # plot only cluster in given subarea
         if subarea:
             ax2.add_patch(subarea._rectangle(
                 linewidth=1, edgecolor='r', facecolor='none'))
@@ -167,6 +174,14 @@ class GeographicArea:
             noise_area = subarea.filter_location(noise)
             if include_noise and len(noise_area) > 0:
                 self.water_scatter(ax1, noise_area, c='yellow', alpha=0.3)
+        elif not n_samples:
+            if include_noise and len(noise) > 0:
+                self.water_scatter(ax1, noise, c='yellow', alpha=0.3)
+            self.water_scatter(ax1, no_noise, alpha=0.5)
+            self.geo_scatter(ax2, no_noise, alpha=0.5)
+
+        if filename:
+            plt.savefig(filename, bbox_inches='tight')
         plt.show()
 
     def geo_scatter(self, ax, df: pd.DataFrame, alpha=0.8, s=8, **kwargs):
