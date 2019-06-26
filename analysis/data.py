@@ -6,6 +6,8 @@ import glob
 from random import choice, sample
 from typing import List, Tuple
 
+from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+
 import cartopy.crs as ccrs
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -110,6 +112,23 @@ class GeographicArea:
             origin, width, height, **kwargs
         )
 
+    def _set_ticks(self, ax, steps=20):
+        # xticks
+        start = int(self.lon[0] / 10) * 10
+        xticks = np.arange(start, self.lon[1] + steps, steps)
+        ax.set_xticks(xticks, crs=ccrs.PlateCarree())
+        # yticks
+        start = int(self.lat[0] / 10) * 10
+        yticks = np.arange(start, self.lat[1] + steps, steps)
+        ax.set_yticks(yticks, crs=ccrs.PlateCarree())
+
+        # cardinal directions
+        lon_formatter = LongitudeFormatter(zero_direction_label=True)
+        ax.xaxis.set_major_formatter(lon_formatter)
+        lat_formatter = LatitudeFormatter()
+        ax.yaxis.set_major_formatter(lat_formatter)
+
+
     def compare_plot(self, X, y,
                      include_noise=True,
                      n_samples=None,
@@ -125,8 +144,8 @@ class GeographicArea:
         # geo
         ax2 = plt.subplot(212, projection=ccrs.PlateCarree())
         ax2.set_extent(self._get_extend(), crs=ccrs.PlateCarree())
+        self._set_ticks(ax2)
         ax2.coastlines()
-
         if n_samples:
             samples = self.cluster_subsample(no_noise, n_samples)
             self.water_scatter(ax1, samples)
@@ -137,7 +156,8 @@ class GeographicArea:
 
         # add box
         if subarea:
-            ax2.add_patch(subarea._rectangle(linewidth=1, edgecolor='r', facecolor='none'))
+            ax2.add_patch(subarea._rectangle(
+                linewidth=1, edgecolor='r', facecolor='none'))
             cluster_area = subarea.cluster_subarea(no_noise)
             outside_area = no_noise[~no_noise.index.isin(cluster_area.index)]
             self.water_scatter(ax1, cluster_area)
@@ -152,9 +172,11 @@ class GeographicArea:
     def geo_scatter(self, ax, df: pd.DataFrame, alpha=0.8, s=8, **kwargs):
         cmap = kwargs.pop('cmap', 'tab20c')
         c = kwargs.pop('c', df['label'])
-        ax.scatter(df['lon'], df['lat'], c=c, cmap=cmap, alpha=alpha, s=s, **kwargs)
+        ax.scatter(df['lon'], df['lat'], c=c, cmap=cmap,
+                   alpha=alpha, s=s, **kwargs)
 
     def water_scatter(self, ax, df: pd.DataFrame, alpha=1, s=8, **kwargs):
         cmap = kwargs.pop('cmap', 'tab20c')
         c = kwargs.pop('c', df['label'])
-        ax.scatter(np.log(df['H2O']), df['delD'], c=c, cmap=cmap,  alpha=alpha, s=s, **kwargs)
+        ax.scatter(np.log(df['H2O']), df['delD'], c=c,
+                   cmap=cmap,  alpha=alpha, s=s, **kwargs)
