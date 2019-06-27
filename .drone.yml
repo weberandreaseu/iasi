@@ -15,8 +15,7 @@ steps:
       path: /tmp/data
   commands:
   - /bin/bash script/setup.sh
-  - "bash -c \"source activate iasi && exec python -m unittest discover -s ./test -p 'integration*.py'\""
-  - python -m unittest discover -s ./test -p "integration*.py"
+  - "bash -c \"source activate iasi && exec python -m unittest discover -v -s ./test -p 'integration*.py'\""
 
 volumes:
 - name: data
