@@ -11,15 +11,22 @@ from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 import cartopy.crs as ccrs
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
+from matplotlib import colors
 import numpy as np
 import pandas as pd
 from netCDF4 import Dataset
+from matplotlib.gridspec import GridSpec
+
 
 Coordinate = Tuple[float, float]
 CoordinateRange = Tuple[float, float]
 
 features = ['lat', 'lon', 'H2O', 'delD']
 flags = ['flag_srf', 'flag_cld', 'flag_qual']
+
+# create a random colormap for nice color separation
+np.random.seed(45)
+random_colors = colors.ListedColormap(np.random.rand(256, 3))
 
 
 class GeographicArea:
@@ -94,10 +101,10 @@ class GeographicArea:
         subsamples = pd.concat(sample_frames)
         return df[df.index.isin(subsamples.index)]
 
-    def cluster_subarea(self, df: pd.DataFrame):
+    def filter_cluster_centroid(self, df: pd.DataFrame):
         # calc mean of each cluster
         groups = df.groupby(['label'])['lat', 'lon'].mean()
-        # filteder cluser with centroid within coordinate range
+        # filter cluster with centroid within coordinate range
         groups = self.filter_location(groups)
         groups['area'] = True
         df = df.merge(groups['area'], left_on='label',
@@ -129,6 +136,9 @@ class GeographicArea:
         lat_formatter = LatitudeFormatter()
         ax.yaxis.set_major_formatter(lat_formatter)
 
+        # set limits
+        ax.set_xlim(self.lon[0], self.lon[1])
+        ax.set_ylim(self.lat[0], self.lat[1])
 
     def compare_plot(self, X, y,
                      include_noise=True,
@@ -142,19 +152,19 @@ class GeographicArea:
         no_noise = df[df['label'] > -1]
 
         # create axes objects
-        fig = plt.figure(figsize=(10,4))
-        ax1 = plt.subplot(122) # H2O/delD
+        fig = plt.figure(figsize=(10, 4))
+        ax1 = plt.subplot(122)  # H2O/delD
         ax1.set_xlabel('H2O [log(ppmv)]')
         ax1.set_ylabel('delD [‰]')
-        ax2 = plt.subplot(121, projection=ccrs.PlateCarree()) # geo
+        ax2 = plt.subplot(112, projection=ccrs.PlateCarree())  # geo
         ax2.set_extent(self._get_extend(), crs=ccrs.PlateCarree())
         self._set_ticks(ax2)
         ax2.coastlines()
 
         # plot noise on map
         if include_noise and len(noise) > 0:
-            self.geo_scatter(ax2, noise, c='yellow', alpha=0.3)
-        
+            self.geo_scatter(ax2, noise, c='#e8e8e8', alpha=1)
+
         # plot only n cluster
         if n_samples:
             samples = self.cluster_subsample(df, n_samples)
@@ -165,7 +175,7 @@ class GeographicArea:
         if subarea:
             ax2.add_patch(subarea._rectangle(
                 linewidth=1, edgecolor='r', facecolor='none'))
-            cluster_area = subarea.cluster_subarea(no_noise)
+            cluster_area = subarea.filter_cluster_centroid(no_noise)
             outside_area = no_noise[~no_noise.index.isin(cluster_area.index)]
             self.water_scatter(ax1, cluster_area)
             self.geo_scatter(ax2, cluster_area)
@@ -173,10 +183,10 @@ class GeographicArea:
             # plot only noise in subarea
             noise_area = subarea.filter_location(noise)
             if include_noise and len(noise_area) > 0:
-                self.water_scatter(ax1, noise_area, c='yellow', alpha=0.3)
+                self.water_scatter(ax1, noise_area, c='#e8e8e8', alpha=1)
         elif not n_samples:
             if include_noise and len(noise) > 0:
-                self.water_scatter(ax1, noise, c='yellow', alpha=0.3)
+                self.water_scatter(ax1, noise, c='#e8e8e8', alpha=1)
             self.water_scatter(ax1, no_noise, alpha=0.5)
             self.geo_scatter(ax2, no_noise, alpha=0.5)
 
@@ -185,13 +195,58 @@ class GeographicArea:
         plt.show()
 
     def geo_scatter(self, ax, df: pd.DataFrame, alpha=0.8, s=8, **kwargs):
-        cmap = kwargs.pop('cmap', 'tab20c')
+        # ax.set_extent(self._get_extend())
+        cmap = kwargs.pop('cmap', random_colors)
         c = kwargs.pop('c', df['label'])
         ax.scatter(df['lon'], df['lat'], c=c, cmap=cmap,
                    alpha=alpha, s=s, **kwargs)
 
     def water_scatter(self, ax, df: pd.DataFrame, alpha=1, s=8, **kwargs):
-        cmap = kwargs.pop('cmap', 'tab20c')
+        cmap = kwargs.pop('cmap', random_colors)
         c = kwargs.pop('c', df['label'])
         ax.scatter(np.log(df['H2O']), df['delD'], c=c,
                    cmap=cmap,  alpha=alpha, s=s, **kwargs)
+
+    def subarea_plot(self, X, y, subarea,
+                     include_noise=True,
+                     filename=None):
+        # cosntruct dataframe and filter noise
+        df = pd.DataFrame(X, columns=features)
+        df['label'] = y
+        noise = df[df['label'] == -1]
+        no_noise = df[df['label'] > -1]
+
+        # create axes objects
+        fig = plt.figure(figsize=(10, 9))
+        gs = GridSpec(3, 2, figure=fig)
+        ax1 = plt.subplot(gs[2, :])  # H2O/delD
+        ax1.set_xlabel('H2O [log(ppmv)]')
+        ax1.set_ylabel('delD [‰]')
+        ax2 = plt.subplot(gs[:2, 0], projection=ccrs.PlateCarree())  # geo
+        ax2.set_extent(self._get_extend(), crs=ccrs.PlateCarree())
+        ax3 = plt.subplot(gs[:2, 1], projection=ccrs.PlateCarree())  # geo
+        ax3.set_extent(subarea._get_extend(), crs=ccrs.PlateCarree())
+        self._set_ticks(ax2)
+        subarea._set_ticks(ax3, 10)
+        ax2.coastlines()
+        ax3.coastlines()
+
+        # plot noise on map
+        if include_noise and len(noise) > 0:
+            self.geo_scatter(ax2, noise, c='#e8e8e8', alpha=1)
+            noise_area = subarea.filter_location(noise)
+            subarea.geo_scatter(ax3, noise_area, c='#e8e8e8', alpha=1)
+            self.water_scatter(ax1, noise_area, c='#e8e8e8', alpha=1)
+
+        ax2.add_patch(subarea._rectangle(
+            linewidth=1, edgecolor='r', facecolor='none'))
+        cluster_area = subarea.filter_cluster_centroid(no_noise)
+        outside_area = no_noise[~no_noise.index.isin(cluster_area.index)]
+        self.water_scatter(ax1, cluster_area)
+        self.geo_scatter(ax2, cluster_area)
+        self.geo_scatter(ax2, outside_area)
+        self.geo_scatter(ax3, cluster_area)
+
+        if filename:
+            plt.savefig(filename, bbox_inches='tight')
+        plt.show()

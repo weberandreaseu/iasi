@@ -10,6 +10,13 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Pipeline",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/pipeline.py",
+            "console": "integratedTerminal"
         }
     ]
 }
