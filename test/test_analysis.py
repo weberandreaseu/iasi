@@ -84,4 +84,4 @@ class TestGridSearch(unittest.TestCase):
         assert luigi.build([task], local_scheduler=True)
         with task.output().open() as out:
             df = pd.read_csv(out)
-            self.assertEqual(df.shape, (4, 13))
+            self.assertEqual(df.shape, (3, 10))

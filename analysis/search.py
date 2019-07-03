@@ -13,17 +13,17 @@ from analysis.data import GeographicArea, features
 from hdbscan import HDBSCAN
 from sklearn.model_selection import ParameterGrid
 
+metrics = {
+    # 'cdbw': CDbw,
+    'davis': davies_bouldin_score,
+    'sil': silhouette_score,
+    'calinski': calinski_harabasz_score
+}
 
 class GridSearch(FileTask):
 
     params = None
     area = GeographicArea(lat=(-25, 50), lon=(-45, 60))
-    metrics = {
-        # 'cdbw': CDbw,
-        'davis': davies_bouldin_score,
-        'sil': silhouette_score,
-        'calinski': calinski_harabasz_score
-    }
 
     def create_pipeline(self):
         raise NotImplementedError
@@ -58,7 +58,7 @@ class GridSearch(FileTask):
             y = pipeline.fit_predict(X)
             stat = list(self.statistics(y))
             param_score = []
-            for scorer in self.metrics.values():
+            for scorer in metrics.values():
                 try:
                     score = scorer(X_, y)
                 except ValueError as err:
@@ -66,7 +66,7 @@ class GridSearch(FileTask):
                 param_score.append(score)
             scores.append(param_score + list(self.statistics(y)))
 
-        scores = pd.DataFrame(data=scores, columns=list(self.metrics.keys()) +
+        scores = pd.DataFrame(data=scores, columns=list(metrics.keys()) +
                               ['total', 'cluster', 'cluster_mean', 'cluster_std', 'noise'])
         results = pd.concat([results, scores], axis=1)
         with self.output().temporary_path() as file:

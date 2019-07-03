@@ -22,7 +22,8 @@ class AggregateClusterStatistics(CustomTask):
         }
         grid_search = clustering.get(self.clustering_algorithm)
         if not grid_search:
-            raise ValueError(f'Valid clustering algorithms are {list(clustering.keys())}')
+            raise ValueError(
+                f'Valid clustering algorithms are {list(clustering.keys())}')
         return [grid_search(file=f, dst=self.dst) for f in glob.glob(self.file_pattern)]
 
     def output(self):
@@ -30,13 +31,24 @@ class AggregateClusterStatistics(CustomTask):
         return luigi.LocalTarget(path=path)
 
     def run(self):
-        frames = [pd.read_csv(task.path, index_col=0) for task in self.input()]
-        df = pd.concat(frames)
-
-        weighted_average = lambda x: np.average(x, weights=df.loc[x.index, 'total'])
-
-        # df.groupby()
-
+        frames = [pd.read_csv(task.path, index_col=0).reset_index()
+                  for task in self.input()]
+        df = pd.concat(frames, ignore_index=True)
+        def weighted_mean_score(x): return np.average(
+            x, weights=df.loc[x.index, 'total'])
+        def weighted_mean_cluster_size(x): return np.average(
+            x, weights=df.loc[x.index, 'cluster'])
+        mapping = {
+            # weight cluster scores with total number of measurments
+            'davis': {'wm_score': weighted_mean_score},
+            'sil': {'wm_score': weighted_mean_score},
+            'calinski': {'wm_score': weighted_mean_score},
+            'total': ['mean', 'std'],
+            'noise': ['mean', 'std'],
+            'cluster': ['mean', 'std'],
+            'cluster_mean': {'wm_cluster_size': weighted_mean_cluster_size}
+        }
+        df = df.groupby(['index']).agg(mapping)
 
         with self.output().temporary_path() as target:
             df.to_csv(target, index=None)
