@@ -60,7 +60,7 @@ class FileTask(CustomTask):
 
     @luigi.Task.event_handler(luigi.Event.START)
     def callback_start(self):
-        if self.log_file:
+        if hasattr(self, 'log_file') and self.log_file:
             # log file destination has to be implemented by concrete task
             filename = filename_by(self.file)
             file = os.path.join(self.dst,
@@ -81,13 +81,15 @@ class FileTask(CustomTask):
     @luigi.Task.event_handler(luigi.Event.SUCCESS)
     def callback_success(self):
         logger.info('Task %s successfully finished', type(self).__name__)
-        self._remove_log_hander()
+        if hasattr(self, '_remove_log_hander'):
+            self._remove_log_hander()
 
     @luigi.Task.event_handler(luigi.Event.FAILURE)
     def callback_failure(self, error):
         logger.error('Task %s failed', type(self).__name__)
         logger.error('Message: %s', error)
-        self._remove_log_hander()
+        if hasattr(self, '_remove_log_hander'):
+            self._remove_log_hander()
 
     def _remove_log_hander(self):
         if hasattr(self, 'log_handler'):
