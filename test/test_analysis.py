@@ -5,6 +5,7 @@ import pandas as pd
 from analysis.data import GeographicArea, features
 from analysis.scaler import SpatialWaterVapourScaler
 from analysis.search import GridSearchHDBSCAN, GridSearchDBSCAN
+from analysis.aggregation import AggregateClusterStatistics
 from sklearn.model_selection import ParameterGrid
 import luigi
 
@@ -57,7 +58,7 @@ class TestGridSearch(unittest.TestCase):
         columns = set(df.columns)
         expected = {'total', 'cluster', 'cluster_mean',
                     'cluster_std', 'noise'}
-        self.assertTrue(expected <=  columns)
+        self.assertTrue(expected <= columns)
         self.assertEqual(df.shape, (1, 13))
 
     def test_dbscan(self):
@@ -71,5 +72,12 @@ class TestGridSearch(unittest.TestCase):
         columns = set(df.columns)
         expected = {'total', 'cluster', 'cluster_mean',
                     'cluster_std', 'noise'}
-        self.assertTrue(expected <=  columns)
+        self.assertTrue(expected <= columns)
         self.assertEqual(df.shape, (1, 14))
+
+    def test_aggregation(self):
+        task = AggregateClusterStatistics(file_pattern=file,
+                                          dst='/tmp/cluster',
+                                          clustering_algorithm='dbscan'
+                                          )
+        assert luigi.build([task], local_scheduler=True)
