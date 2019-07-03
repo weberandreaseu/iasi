@@ -4,6 +4,9 @@ import pandas as pd
 
 from analysis.data import GeographicArea, features
 from analysis.scaler import SpatialWaterVapourScaler
+from analysis.search import GridSearchHDBSCAN, GridSearchDBSCAN
+from sklearn.model_selection import ParameterGrid
+import luigi
 
 file = 'test/resources/METOPAB_20160101_global_evening_1000.nc'
 
@@ -39,3 +42,34 @@ class TestScaler(unittest.TestCase):
         self.assertAlmostEqual(X_[1, 1] * scaler.km, -425, places=0)
         # lon
         self.assertAlmostEqual(X_[0, 0] * scaler.km, 40 * 111)
+
+
+class TestGridSearch(unittest.TestCase):
+
+    def test_hdbscan(self):
+        task = GridSearchHDBSCAN(
+            file=file,
+            dst='/tmp/cluster',
+            force_upstream=True
+        )
+        assert luigi.build([task], local_scheduler=True)
+        df = pd.read_csv(task.output().path)
+        columns = set(df.columns)
+        expected = {'total', 'cluster', 'cluster_mean',
+                    'cluster_std', 'noise'}
+        self.assertTrue(expected <=  columns)
+        self.assertEqual(df.shape, (1, 13))
+
+    def test_dbscan(self):
+        task = GridSearchDBSCAN(
+            file=file,
+            dst='/tmp/cluster',
+            force_upstream=True
+        )
+        assert luigi.build([task], local_scheduler=True)
+        df = pd.read_csv(task.output().path)
+        columns = set(df.columns)
+        expected = {'total', 'cluster', 'cluster_mean',
+                    'cluster_std', 'noise'}
+        self.assertTrue(expected <=  columns)
+        self.assertEqual(df.shape, (1, 14))
