@@ -3,7 +3,7 @@ import os
 
 import luigi
 
-from analysis.search import GridSearchDBSCAN, GridSearchHDBSCAN
+from analysis.search import GridSearchDBSCAN, GridSearchHDBSCAN, GridSearch
 from iasi.file import CustomTask, ReadFile
 import pandas as pd
 import numpy as np
@@ -15,7 +15,7 @@ class AggregateClusterStatistics(CustomTask):
     clustering_algorithm = luigi.Parameter()
     dst = luigi.Parameter()
 
-    def requires(self):
+    def clustering_task(self) -> GridSearch:
         clustering = {
             'dbscan': GridSearchDBSCAN,
             'hdbscan': GridSearchHDBSCAN
@@ -24,6 +24,10 @@ class AggregateClusterStatistics(CustomTask):
         if not grid_search:
             raise ValueError(
                 f'Valid clustering algorithms are {list(clustering.keys())}')
+        return grid_search
+
+    def requires(self):
+        grid_search = self.clustering_task()
         return [grid_search(file=f, dst=self.dst) for f in glob.glob(self.file_pattern)]
 
     def output(self):
@@ -48,7 +52,12 @@ class AggregateClusterStatistics(CustomTask):
             'cluster': ['mean', 'std'],
             'cluster_mean': {'wm_cluster_size': weighted_mean_cluster_size}
         }
-        df = df.groupby(['index']).agg(mapping)
+        params = list(self.clustering_task().params.keys())
+        agg_scores = df.groupby('index').agg(mapping)
+        # flatten multiindex columns of agg_scores
+        agg_scores.columns = list(map('_'.join, agg_scores.columns.values))
+        agg_params = df.groupby('index')[params].mean()
+        agg = pd.concat([agg_params, agg_scores], axis=1)
 
         with self.output().temporary_path() as target:
-            df.to_csv(target, index=None)
+            agg.to_csv(target, index=None)
