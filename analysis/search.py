@@ -80,7 +80,7 @@ class GridSearchDBSCAN(GridSearch):
         'scaler__H2O': [0.1],
         'scaler__delD': [10],
         'cluster__eps': [2],
-        'cluster__min_samples': [12]
+        'cluster__min_samples': [10, 12]
     }
 
     def output_directory(self):
@@ -99,7 +99,7 @@ class GridSearchHDBSCAN(GridSearch):
         'scaler__km': [60],
         'scaler__H2O': [0.1],
         'scaler__delD': [10],
-        'cluster__min_cluster_size': [12]
+        'cluster__min_cluster_size': [10, 12]
     }
 
     def output_directory(self):
