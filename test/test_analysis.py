@@ -59,7 +59,7 @@ class TestGridSearch(unittest.TestCase):
         expected = {'total', 'n_cluster', 'cluster_size_mean',
                     'cluster_size_std', 'noise'}
         self.assertTrue(expected <= columns)
-        self.assertEqual(df.shape, (2, 15))
+        self.assertEqual(df.shape, (2, 14))
 
     def test_dbscan(self):
         task = GridSearchDBSCAN(
@@ -73,7 +73,7 @@ class TestGridSearch(unittest.TestCase):
         expected = {'total', 'n_cluster', 'cluster_size_mean',
                     'cluster_size_std', 'noise'}
         self.assertTrue(expected <= columns)
-        self.assertEqual(df.shape, (2, 15))
+        self.assertEqual(df.shape, (2, 14))
 
     def test_aggregation(self):
         task = AggregateClusterStatistics(file_pattern='test/resources/METOPAB*evening_1000.nc',
@@ -84,4 +84,4 @@ class TestGridSearch(unittest.TestCase):
         assert luigi.build([task], local_scheduler=True)
         with task.output().open() as out:
             df = pd.read_csv(out)
-            self.assertEqual(df.shape, (2, 16))
+            self.assertEqual(df.shape, (2, 15))

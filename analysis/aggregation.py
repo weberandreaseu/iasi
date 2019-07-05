@@ -44,7 +44,6 @@ class AggregateClusterStatistics(CustomTask):
             x, weights=df.loc[x.index, 'n_cluster'])
         mapping = {
             # weight cluster scores with total number of measurments
-            'cdbw': {'wm_score': weighted_mean_score},
             'davis': {'wm_score': weighted_mean_score},
             'sil': {'wm_score': weighted_mean_score},
             'calinski': {'wm_score': weighted_mean_score},
