@@ -56,10 +56,10 @@ class TestGridSearch(unittest.TestCase):
         assert luigi.build([task], local_scheduler=True)
         df = pd.read_csv(task.output().path)
         columns = set(df.columns)
-        expected = {'total', 'cluster', 'cluster_mean',
-                    'cluster_std', 'noise'}
+        expected = {'total', 'n_cluster', 'cluster_size_mean',
+                    'cluster_size_std', 'noise'}
         self.assertTrue(expected <= columns)
-        self.assertEqual(df.shape, (2, 14))
+        self.assertEqual(df.shape, (2, 15))
 
     def test_dbscan(self):
         task = GridSearchDBSCAN(
@@ -70,8 +70,8 @@ class TestGridSearch(unittest.TestCase):
         assert luigi.build([task], local_scheduler=True)
         df = pd.read_csv(task.output().path)
         columns = set(df.columns)
-        expected = {'total', 'cluster', 'cluster_mean',
-                    'cluster_std', 'noise'}
+        expected = {'total', 'n_cluster', 'cluster_size_mean',
+                    'cluster_size_std', 'noise'}
         self.assertTrue(expected <= columns)
         self.assertEqual(df.shape, (2, 15))
 

@@ -21,8 +21,9 @@ X = df[features].values
 
 # create estimators
 scaler = SpatialWaterVapourScaler()
-cluster = DBSCAN(eps=2.6, min_samples=12)
-# cluster = HDBSCAN(min_cluster_size=12)
+# cluster = DBSCAN(eps=2.6, min_samples=12)
+# cluster = DBSCAN(eps=2, min_samples=12)
+cluster = HDBSCAN(min_cluster_size=12, gen_min_span_tree=True)
 
 # create pipeline
 pipeline = Pipeline([

@@ -41,7 +41,7 @@ class AggregateClusterStatistics(CustomTask):
         def weighted_mean_score(x): return np.average(
             x, weights=df.loc[x.index, 'total'])
         def weighted_mean_cluster_size(x): return np.average(
-            x, weights=df.loc[x.index, 'cluster'])
+            x, weights=df.loc[x.index, 'n_cluster'])
         mapping = {
             # weight cluster scores with total number of measurments
             'cdbw': {'wm_score': weighted_mean_score},
@@ -50,9 +50,13 @@ class AggregateClusterStatistics(CustomTask):
             'calinski': {'wm_score': weighted_mean_score},
             'total': ['mean', 'std'],
             'noise': ['mean', 'std'],
-            'cluster': ['mean', 'std'],
-            'cluster_mean': {'wm_cluster_size': weighted_mean_cluster_size}
+            'n_cluster': ['mean', 'std'],
+            'cluster_size_mean': {'wm_cluster_size': weighted_mean_cluster_size}
         }
+        if self.clustering_algorithm == 'hdbscan':
+            # DBCV is only defined for HDBSCAN
+            mapping['dbcv'] = {'wm_score': weighted_mean_score}
+
         params = list(self.clustering_task().params.keys())
         agg_scores = df.groupby('index').agg(mapping)
         # flatten multiindex columns of agg_scores
