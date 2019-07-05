@@ -12,6 +12,8 @@ from sklearn.metrics import (calinski_harabasz_score, davies_bouldin_score,
 from sklearn.model_selection import ParameterGrid
 from sklearn.pipeline import Pipeline
 
+from typing import List
+
 from analysis.data import GeographicArea, features
 from analysis.scaler import SpatialWaterVapourScaler
 from iasi.file import FileTask
@@ -24,6 +26,7 @@ metrics = {
 }
 
 logger = logging.getLogger(__name__)
+
 
 class GridSearch(FileTask):
 
@@ -67,14 +70,25 @@ class GridSearch(FileTask):
                 logger.info(f'Calculate {name} score')
                 try:
                     score = scorer(X_[noise_mask], y[noise_mask])
-                except ValueError as err:
+                except Exception as err:
                     logger.warn(f'Skipped {name}: {err}')
                     score = np.nan
                 param_score.append(score)
+            if isinstance(self, GridSearchHDBSCAN):
+                # DBCV score in calaculated by HDBSCAN clusterer
+                cluster = pipeline.named_steps['cluster']
+                param_score.append(cluster._relative_validity)
             scores.append(param_score + list(self.statistics(y)))
 
-        scores = pd.DataFrame(data=scores, columns=list(metrics.keys()) +
-                              ['total', 'cluster', 'cluster_mean', 'cluster_std', 'noise'])
+        if isinstance(self, GridSearchHDBSCAN):
+            column_names = list(metrics.keys()) \
+                + ['dbcv', 'total', 'n_cluster',
+                    'cluster_size_mean', 'cluster_size_std', 'noise']
+        else:
+            column_names = list(metrics.keys()) \
+                + ['total', 'n_cluster',
+                   'cluster_size_mean', 'cluster_size_std', 'noise']
+        scores = pd.DataFrame(data=scores,  columns=column_names)
         results = pd.concat([results, scores], axis=1)
         with self.output().temporary_path() as file:
             results.to_csv(file)
@@ -115,5 +129,5 @@ class GridSearchHDBSCAN(GridSearch):
     def create_pipeline(self) -> Pipeline:
         return Pipeline([
             ('scaler', SpatialWaterVapourScaler()),
-            ('cluster', HDBSCAN())
+            ('cluster', HDBSCAN(gen_min_span_tree=True))
         ])

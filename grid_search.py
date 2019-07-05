@@ -25,7 +25,7 @@ dbscan = GridSearchDBSCAN(file=file, dst='/tmp/cluster')
 
 agg_dbscan = AggregateClusterStatistics(
     file_pattern=file,
-    dst='/tmp/cluster',
+    dst='data/cluster',
     force_upstream=True,
     clustering_algorithm='dbscan'
 )
