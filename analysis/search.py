@@ -1,24 +1,29 @@
 
+import logging
+
 import luigi
 import numpy as np
 import pandas as pd
-from sklearn.pipeline import Pipeline
+from cdbw import CDbw
+from hdbscan import HDBSCAN
+from sklearn.cluster import DBSCAN
 from sklearn.metrics import (calinski_harabasz_score, davies_bouldin_score,
                              silhouette_score)
-from sklearn.cluster import DBSCAN
-
-from iasi.file import FileTask
-from analysis.scaler import SpatialWaterVapourScaler
-from analysis.data import GeographicArea, features
-from hdbscan import HDBSCAN
 from sklearn.model_selection import ParameterGrid
+from sklearn.pipeline import Pipeline
+
+from analysis.data import GeographicArea, features
+from analysis.scaler import SpatialWaterVapourScaler
+from iasi.file import FileTask
 
 metrics = {
-    # 'cdbw': CDbw,
+    'cdbw': CDbw,
     'davis': davies_bouldin_score,
     'sil': silhouette_score,
     'calinski': calinski_harabasz_score
 }
+
+logger = logging.getLogger(__name__)
 
 class GridSearch(FileTask):
 
@@ -51,17 +56,19 @@ class GridSearch(FileTask):
         scores = []
         X = self.load_data()
         pipeline = self.create_pipeline()
-        for i, params in enumerate(param_grid):
+        for params in param_grid:
             pipeline.set_params(**params)
             scaler = pipeline.named_steps['scaler']
             X_ = scaler.fit_transform(X)
             y = pipeline.fit_predict(X)
-            stat = list(self.statistics(y))
+            noise_mask = y > -1
             param_score = []
-            for scorer in metrics.values():
+            for name, scorer in metrics.items():
+                logger.info(f'Calculate {name} score')
                 try:
-                    score = scorer(X_, y)
+                    score = scorer(X_[noise_mask], y[noise_mask])
                 except ValueError as err:
+                    logger.warn(f'Skipped {name}: {err}')
                     score = np.nan
                 param_score.append(score)
             scores.append(param_score + list(self.statistics(y)))
@@ -79,7 +86,7 @@ class GridSearchDBSCAN(GridSearch):
         'scaler__km': [60],
         'scaler__H2O': [0.1],
         'scaler__delD': [10],
-        'cluster__eps': [2],
+        'cluster__eps': [2.],
         'cluster__min_samples': [10, 12]
     }
 
