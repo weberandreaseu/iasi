@@ -13,6 +13,7 @@ import pandas as pd
 from analysis.data import GeographicArea, features
 from analysis.scaler import SpatialWaterVapourScaler
 from analysis.search import GridSearchDBSCAN, GridSearchHDBSCAN
+from analysis.aggregation import AggregateClusterStatistics
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -20,6 +21,13 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # file = 'test/resources/METOPAB_20160101_global_evening_1000.nc'
 file = 'data/input/METOPAB_20160801_global_evening.nc'
 dbscan = GridSearchDBSCAN(file=file, dst='/tmp/cluster')
-hdbscan = GridSearchHDBSCAN(file=file, dst='/tmp/cluster')
+# hdbscan = GridSearchHDBSCAN(file=file, dst='/tmp/cluster')
 
-luigi.build([dbscan, hdbscan], local_scheduler=True)
+agg_dbscan = AggregateClusterStatistics(
+    file_pattern=file,
+    dst='/tmp/cluster',
+    force_upstream=True,
+    clustering_algorithm='dbscan'
+)
+
+luigi.build([agg_dbscan], local_scheduler=True)
