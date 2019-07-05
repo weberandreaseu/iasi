@@ -4,7 +4,6 @@ import logging
 import luigi
 import numpy as np
 import pandas as pd
-from cdbw import CDbw
 from hdbscan import HDBSCAN
 from sklearn.cluster import DBSCAN
 from sklearn.metrics import (calinski_harabasz_score, davies_bouldin_score,
@@ -19,7 +18,6 @@ from analysis.scaler import SpatialWaterVapourScaler
 from iasi.file import FileTask
 
 metrics = {
-    'cdbw': CDbw,
     'davis': davies_bouldin_score,
     'sil': silhouette_score,
     'calinski': calinski_harabasz_score
