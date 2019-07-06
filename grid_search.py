@@ -10,24 +10,44 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from analysis.aggregation import AggregateClusterStatistics
 from analysis.data import GeographicArea, features
 from analysis.scaler import SpatialWaterVapourScaler
 from analysis.search import GridSearchDBSCAN, GridSearchHDBSCAN
-from analysis.aggregation import AggregateClusterStatistics
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+file_pattern = 'test/resources/METOPAB_*global_evening*.nc'
 
-# file = 'test/resources/METOPAB_20160101_global_evening_1000.nc'
-file = 'data/input/METOPAB_20160801_global_evening.nc'
-dbscan = GridSearchDBSCAN(file=file, dst='/tmp/cluster')
-# hdbscan = GridSearchHDBSCAN(file=file, dst='/tmp/cluster')
+dbscan_params = {
+    'scaler__km': [50, 60, 70, 80],
+    'scaler__H2O': [0.11, 0.12, 0.13, 0.14],
+    'scaler__delD': [6, 7, 8, 10],
+    'cluster__eps': [1.8, 2, 2.2, 2.4],
+    'cluster__min_samples': [8, 10, 12, 14],
+}
+
+hdbscan_params = {
+    'scaler__km': [50, 60, 70, 80],
+    'scaler__H2O': [0.11, 0.12, 0.13, 0.14],
+    'scaler__delD': [6, 7, 8, 10],
+    'cluster__min_cluster_size': [10, 12, 14]
+}
 
 agg_dbscan = AggregateClusterStatistics(
-    file_pattern=file,
-    dst='data/cluster',
+    dbscan_params,
+    file_pattern=file_pattern,
+    dst='/tmp/cluster/grid',
     force_upstream=True,
-    clustering_algorithm='dbscan'
+    clustering_algorithm='dbscan',
+)
+
+agg_hdbscan = AggregateClusterStatistics(
+    hdbscan_params,
+    file_pattern=file_pattern,
+    dst='/tmp/cluster/grid',
+    force_upstream=True,
+    clustering_algorithm='hdbscan',
 )
 
 luigi.build([agg_dbscan], local_scheduler=True)

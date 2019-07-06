@@ -28,8 +28,26 @@ logger = logging.getLogger(__name__)
 
 class GridSearch(FileTask):
 
-    params = None
+    def __init__(self, grid_params=None, *args, **kwargs):
+        self._grid_params = grid_params
+        super().__init__(*args, **kwargs)
+
     area = GeographicArea(lat=(-25, 50), lon=(-45, 60))
+
+    @property
+    def grid_params(self):
+        if self._grid_params:
+            return self._grid_params
+        self._grid_params = self.default_parameters()
+        return self._grid_params
+
+    @grid_params.setter
+    def grid_params(self, value):
+        self._grid_params = value
+
+    @classmethod
+    def default_parameters(cls):
+        raise NotImplementedError
 
     def create_pipeline(self):
         raise NotImplementedError
@@ -52,12 +70,12 @@ class GridSearch(FileTask):
         return df.values
 
     def run(self):
-        param_grid = list(ParameterGrid(self.params))
+        param_grid = list(ParameterGrid(self.grid_params))
         results = pd.DataFrame(data=param_grid)
         scores = []
         X = self.load_data()
-        pipeline = self.create_pipeline()
         for params in param_grid:
+            pipeline = self.create_pipeline()
             pipeline.set_params(**params)
             scaler = pipeline.named_steps['scaler']
             X_ = scaler.fit_transform(X)
@@ -75,7 +93,9 @@ class GridSearch(FileTask):
             if isinstance(self, GridSearchHDBSCAN):
                 # DBCV score in calaculated by HDBSCAN clusterer
                 cluster = pipeline.named_steps['cluster']
-                param_score.append(cluster._relative_validity)
+                dbcv_score = cluster.relative_validity_
+                logger.info(f'Calculate dbcv score {dbcv_score}')
+                param_score.append(dbcv_score)
             scores.append(param_score + list(self.statistics(y)))
 
         if isinstance(self, GridSearchHDBSCAN):
@@ -94,13 +114,15 @@ class GridSearch(FileTask):
 
 class GridSearchDBSCAN(GridSearch):
 
-    params = {
-        'scaler__km': [60],
-        'scaler__H2O': [0.1],
-        'scaler__delD': [10],
-        'cluster__eps': [2.],
-        'cluster__min_samples': [10, 12]
-    }
+    @classmethod
+    def default_parameters(cls):
+        return {
+            'scaler__km': [60],
+            'scaler__H2O': [0.1],
+            'scaler__delD': [10],
+            'cluster__eps': [2.],
+            'cluster__min_samples': [10, 12]
+        }
 
     def output_directory(self):
         return 'dbscan'
@@ -114,12 +136,14 @@ class GridSearchDBSCAN(GridSearch):
 
 class GridSearchHDBSCAN(GridSearch):
 
-    params = {
-        'scaler__km': [60],
-        'scaler__H2O': [0.1],
-        'scaler__delD': [10],
-        'cluster__min_cluster_size': [10, 12]
-    }
+    @classmethod
+    def default_parameters(cls):
+        return {
+            'scaler__km': [60],
+            'scaler__H2O': [0.1],
+            'scaler__delD': [10],
+            'cluster__min_cluster_size': [10, 12]
+        }
 
     def output_directory(self):
         return 'hdbscan'
