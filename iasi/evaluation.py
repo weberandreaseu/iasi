@@ -131,6 +131,9 @@ class VariableErrorEstimation(FileTask):
     variable = luigi.Parameter()
     thresholds = luigi.ListParameter(default=[1e-3])
 
+    def output_extension(self):
+        return '.csv'
+
     def requires(self):
         compressed = [DecompressDataset(
             dst=self.dst,
