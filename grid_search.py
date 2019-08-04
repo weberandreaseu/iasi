@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from analysis.aggregation import AggregateClusterStatistics
-from analysis.data import GeographicArea, features
+from analysis.data import GeographicArea
 from analysis.scaler import SpatialWaterVapourScaler
 from analysis.search import GridSearchDBSCAN, GridSearchHDBSCAN
 
@@ -50,4 +50,4 @@ agg_hdbscan = AggregateClusterStatistics(
     clustering_algorithm='hdbscan',
 )
 
-luigi.build([agg_dbscan], local_scheduler=True)
+luigi.build([agg_dbscan, agg_hdbscan], local_scheduler=True)
