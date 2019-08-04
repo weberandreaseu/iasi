@@ -8,6 +8,7 @@ steps:
   commands:
   - /bin/bash script/setup.sh
   - "bash -c \"source activate iasi && exec python -m unittest discover -v -s ./test\""
+  - "bash -c \"source activate iasi && exec python -m unittest discover -v -s ./test -p 'analysis*.py'\""
 - name: integration test
   image: conda/miniconda3
   volumes:
