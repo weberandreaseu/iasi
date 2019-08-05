@@ -1,6 +1,8 @@
 # Storage-Efficient Analysis of Spatio-Temporal Data with Application to Climate Research
 
 [![Build Status](https://drone.weberandreas.eu/api/badges/weberandreaseu/iasi/status.svg)](https://drone.weberandreas.eu/weberandreaseu/iasi)
+[![DOI](https://zenodo.org/badge/165744489.svg)](https://zenodo.org/badge/latestdoi/165744489)
+
 
 Source code of my master's thesis in context of [Project Motiv](http://gepris.dfg.de/gepris/projekt/290612604).
 The thesis has two main contributions:
