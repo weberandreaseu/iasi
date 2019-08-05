@@ -1,6 +1,6 @@
 # %%
 """
-Test differen clustering algorithms and score them with different metrics.
+Test different clustering algorithms and score them with different metrics.
 Find promising parameter sets using grid search.
 """
 import warnings

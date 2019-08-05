@@ -1,4 +1,4 @@
-# Storage efficient analysis of spatio temporal data with application to climate research
+# Storage-Efficient Analysis of Spatio-Temporal Data with Application to Climate Research
 
 [![Build Status](https://drone.weberandreas.eu/api/badges/weberandreaseu/iasi/status.svg)](https://drone.weberandreas.eu/weberandreaseu/iasi)
 
@@ -10,8 +10,6 @@ The thesis has two main contributions:
 
 
 ## Compression
-
-
 
 ### Setup
 
@@ -171,3 +169,39 @@ since there is no central component coordinating multiple compute node.
 - `--force-upstream`: delete all intermediate task output (excluding `--file`)
 - `--log-file`: log task output to a file into destination directory (log file is automatically created)
 
+## Analysis
+
+### Setup
+
+Analysis of data requires conda setup (pip will not work):
+
+1. Create conda environment: `conda env create -f environment.yml`
+1. Activate conda environment: `conda activate iasi`
+1. (Optional) run analysis specific tests: `python -m unittest discover -v -s ./test -p 'analysis*.py'`
+
+
+### Clustering
+
+The [pipeline.py](pipeline.py) file provides an example for spatio-temporal clustering.
+With `analysis.data.GeographicArea`, you can specifiy the geographic extent of your analysis. By running the file
+
+```
+python pipeline.py
+```
+
+you receive something link this (depending on input data):
+
+![images/hdbscan.png](images/hdbscan.png)
+
+
+### Grid Search
+
+For quantitative analysis, you can perform GridSearch using [grid_search.py](grid_search.py):
+
+```
+python grid_search.py
+```
+
+Analogous to compression, `analysis.aggregation.AggregateClusterStatistics` is a luigi task that collects all clustered results
+in a CSV including among others [Davies-Bouldin Index](https://en.wikipedia.org/wiki/Davies%E2%80%93Bouldin_index) , [Silhoutte Index](https://en.wikipedia.org/wiki/Silhouette_(clustering)) and [DBCV](http://www.dbs.ifi.lmu.de/~zimek/publications/SDM2014/DBCV.pdf) (for HDBSCAN).
+As shown in the example, you can pass custom parameters to the clustering algorithm as well as to the feature scaler.
