@@ -27,7 +27,7 @@ export MKL_NUM_THREADS=$NUM_THREADS
 export NUMEXPR_NUM_THREADS=$NUM_THREADS
 export OMP_NUM_THREADS=$NUM_THREADS
 
-cd $project
+cd "$project" || exit
 source activate iasi
 
 
@@ -38,10 +38,10 @@ source activate iasi
 # --date-interval 2019-05-03-2019-06-19
 # for details see https://luigi.readthedocs.io/en/stable/_modules/luigi/date_interval.html
 python -m luigi --module iasi.compression CompressDateRange \
-        --date-interval $1 \
-        --src $SRC \
-        --dst $DST \
-        --workers $SLURM_CPUS_PER_TASK \
+        --date-interval "$1" \
+        --src "$SRC" \
+        --dst "$DST" \
+        --workers "$SLURM_CPUS_PER_TASK" \
         --no-lock # prevents exclusive assignment to a node in case of multiple compute nodes
 
 # python -m luigi --module iasi CompressDataset \
