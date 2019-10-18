@@ -1,4 +1,4 @@
-# !/bin/bash
+#!/bin/bash
 
 # used to reduce numpy threads for task level parallelism
 
