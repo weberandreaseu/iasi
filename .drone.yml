@@ -9,16 +9,16 @@ steps:
   - /bin/bash script/setup.sh
   - "bash -c \"source activate iasi && exec python -m unittest discover -v -s ./test\""
   - "bash -c \"source activate iasi && exec python -m unittest discover -v -s ./test -p 'analysis*.py'\""
-- name: integration test
-  image: conda/miniconda3
-  volumes:
-    - name: data
-      path: /tmp/data
-  commands:
-  - /bin/bash script/setup.sh
-  - "bash -c \"source activate iasi && exec python -m unittest discover -v -s ./test -p 'integration*.py'\""
+# - name: integration test
+#   image: conda/miniconda3
+#   volumes:
+#     - name: data
+#       path: /tmp/data
+#   commands:
+#   - /bin/bash script/setup.sh
+#   - "bash -c \"source activate iasi && exec python -m unittest discover -v -s ./test -p 'integration*.py'\""
 
-volumes:
-- name: data
-  host:
-    path: /home/andreas/projects/motiv/data/
+# volumes:
+# - name: data
+#   host:
+#     path: /home/andreas/projects/motiv/data/
